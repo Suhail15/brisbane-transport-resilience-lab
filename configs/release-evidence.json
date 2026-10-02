@@ -1,0 +1,9 @@
+{
+  "public_bundle_service_dates": [],
+  "independent_otp": {"passed": false, "evidence_ref": null},
+  "performance": {"passed": false, "evidence_ref": null},
+  "licences": {"passed": false, "evidence_ref": null},
+  "secrets": {"passed": false, "evidence_ref": null},
+  "ci": {"passed": false, "evidence_ref": null},
+  "static_demo": {"passed": false, "evidence_ref": null}
+}

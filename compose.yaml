@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: resilience
+      POSTGRES_USER: resilience
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development}
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resilience -d resilience"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 1g
+  redpanda:
+    image: redpandadata/redpanda:v25.2.4
+    command: ["redpanda", "start", "--smp", "1", "--memory", "512M", "--reserve-memory", "0M", "--overprovisioned", "--node-id", "0", "--kafka-addr", "internal://0.0.0.0:9092,external://0.0.0.0:19092", "--advertise-kafka-addr", "internal://redpanda:9092,external://127.0.0.1:19092"]
+    ports: ["127.0.0.1:19092:19092"]
+    volumes: ["redpanda_data:/var/lib/redpanda/data"]
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 1g
+  api:
+    build: .
+    profiles: ["app"]
+    environment:
+      DATABASE_URL: postgresql://resilience:${POSTGRES_PASSWORD:-local-development}@postgres:5432/resilience
+      REDPANDA_BROKERS: redpanda:9092
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["./data:/app/data", "./configs:/app/configs:ro"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redpanda: {condition: service_healthy}
+    mem_limit: 2g
+volumes:
+  postgres_data:
+  redpanda_data:

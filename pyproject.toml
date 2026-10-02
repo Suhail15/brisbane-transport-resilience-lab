@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brisbane-transport-resilience-lab"
+version = "0.1.0"
+requires-python = ">=3.11,<3.13"
+dependencies = ["fastapi", "uvicorn", "pydantic>=2", "httpx", "pandas", "duckdb", "pyarrow", "psycopg[binary]", "confluent-kafka", "gtfs-realtime-bindings", "networkx", "shapely", "PyYAML"]
+
+[project.scripts]
+resilience = "resilience.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["services"]
+
+[tool.pytest.ini_options]
+pythonpath = ["services"]
+testpaths = ["tests"]
