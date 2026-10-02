@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+# Keep text manifests and reproducibility hashes stable across operating systems.
+*.json text eol=lf
+*.jsonl text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.sha256 text eol=lf
+
+# Treat generated databases, archives, and transit extracts as binary.
+*.parquet binary
+*.duckdb binary
+*.sqlite binary
+*.sqlite3 binary
+*.zip binary
+*.gz binary

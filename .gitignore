@@ -1,0 +1,54 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.secrets/
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python environments, caches, and build output
+.venv/
+venv/
+env/
+.cache/
+cache/
+runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# JavaScript dependencies and generated output
+node_modules/
+.vite/
+coverage/
+frontend/dist/
+
+# Local data and runtime stores; source manifests and small reviewed fixtures may be tracked
+data/raw/
+data/bootstrap/**
+!data/bootstrap/.gitkeep
+data/staging/
+data/processed/
+data/derived/
+data/runtime/
+data/cache/
+*.parquet
+*.duckdb
+*.sqlite
+*.sqlite3
+
+# Logs, temporary files, and local OS metadata
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
