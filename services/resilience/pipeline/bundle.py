@@ -91,6 +91,6 @@ def export_bundle(archive,output,*,public=False,compact=True,candidate=False):
         runs.append(summary(run,normalized if not legacy else None,load_snapshot(archive,run['snapshot_id'])))
         atomic_write(root/"experiments"/f"{run_id}.json",json.dumps(run))
     atomic_write(root/"experiments"/"index.json",json.dumps({"version":1,"runs":runs}))
-    manifest={"version":1,"public":public,"candidate_preparation_only":candidate,"compact":compact,"files":{str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob("*") if p.is_file() and p.name!="manifest.json"}}
+    manifest={"version":1,"public":public,"candidate_preparation_only":candidate,"compact":compact,"files":{p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob("*") if p.is_file() and p.name!="manifest.json"}}
     atomic_write(root/"manifest.json",json.dumps(manifest,indent=2))
     return {"root":str(root),"snapshots":len(snapshots),"completed_runs":len(runs),"public":public,"compact":compact}

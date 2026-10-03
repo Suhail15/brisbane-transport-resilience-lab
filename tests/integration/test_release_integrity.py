@@ -114,6 +114,10 @@ def test_export_and_api_include_final_without_mutable(final_archive,tmp_path,mon
     from resilience.pipeline.bundle import export_bundle
     ar,run=final_archive;(ar.root/'processed/experiments/final.json').unlink()
     assert export_bundle(ar,tmp_path/'bundle')['completed_runs']==1
+    from resilience.pipeline.integrity import verify_manifest_files
+    files=json.loads((tmp_path/'bundle/manifest.json').read_text())['files']
+    assert 'experiments/final.json' in files and all('\\' not in key for key in files)
+    verify_manifest_files(tmp_path/'bundle',files)
     exported=json.loads((tmp_path/'bundle/experiments/final.json').read_text())
     assert exported['metadata']==run['metadata'] and not exported['legacy_unversioned']
     monkeypatch.setattr(api,'archive',ar);monkeypatch.setattr(api,'runs',{})

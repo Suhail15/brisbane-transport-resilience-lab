@@ -2,7 +2,7 @@
 import hashlib
 import json
 from datetime import datetime
-from pathlib import Path,PureWindowsPath
+from pathlib import Path,PurePosixPath,PureWindowsPath
 from .analysis import canonical,digest,engine_digest
 
 
@@ -37,9 +37,9 @@ def verify_manifest_files(root,files):
     root=Path(root).resolve()
     expected=set(files)
     for name in expected:
-        path=Path(name)
-        if path.is_absolute() or PureWindowsPath(name).drive or '\\' in name or '..' in path.parts or name!=path.as_posix() or name=='manifest.json':raise ValueError('Unsafe manifest path')
-        target=root/path
+        path=PurePosixPath(name);windows=PureWindowsPath(name)
+        if path.is_absolute() or path.root or windows.drive or windows.root or '\\' in name or '..' in path.parts or name!=path.as_posix() or name=='manifest.json':raise ValueError('Unsafe manifest path')
+        target=root/Path(name)
         if any(part.is_symlink() for part in (target,*target.parents) if part!=root and root in part.parents):raise ValueError('Symlink in manifest path')
         if not target.is_file():raise ValueError('Missing manifest file')
     actual=set()
