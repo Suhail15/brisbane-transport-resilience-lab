@@ -27,12 +27,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Build when frontend exists
-        shell: bash
-        run: |
-          if [ -f frontend/package-lock.json ]; then
-            npm ci --prefix frontend
-            npm run build --prefix frontend
-          else
-            echo 'Frontend is not implemented yet; no frontend build evidence claimed.'
-          fi
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend

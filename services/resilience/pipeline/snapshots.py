@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib
+from functools import lru_cache
 import json
 from pathlib import Path
 from datetime import datetime, time, timezone
@@ -150,7 +151,11 @@ def load_snapshot(archive,snapshot_id):
     if not snapshot_id.isalnum():raise KeyError(snapshot_id)
     path=archive.root/"processed"/"snapshots"/f"{snapshot_id}.json"
     if not path.exists():raise KeyError(snapshot_id)
-    return TimetableSnapshot.model_validate_json(path.read_text())
+    return _cached_snapshot(str(path.resolve()))
+
+@lru_cache(maxsize=3)
+def _cached_snapshot(path):
+    return TimetableSnapshot.model_validate_json(Path(path).read_text())
 
 def snapshot_index(archive):
     root=archive.root/"processed"/"snapshots"

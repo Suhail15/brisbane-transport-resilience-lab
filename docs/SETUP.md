@@ -37,11 +37,33 @@ The official PostGIS image requires linux/amd64 emulation on the tested Apple Si
 Mac; Redpanda remains native. Named volumes are project scoped. Use `docker compose
 stop` to stop this project's services. Do not prune unrelated Docker objects.
 Mac startup, live health, PostGIS storage and Redpanda deliveries were exercised.
-Windows/Linux clean installs are CI matrix checks; no successful remote CI run is
-claimed here. No Homebrew installation is required.
+The private repository Verification run 36965117356 passed the macOS/Linux/Windows
+backend matrix at fec68f7. INT-003 adds mandatory frontend install/test/build; its
+new candidate revision still needs a fresh CI run. No Homebrew installation is required.
 
 OTP is separate independent validation: official OTP 2.10.0 requires Java 25. Set up
 Java and the official shaded JAR, then `python scripts/prepare_otp.py` and `python
 scripts/convert_osm.py`. Run `java -Xmx2G -jar <OTP.jar> --build --save data/derived/otp`, then
-`java -Xmx2G -jar <OTP.jar> --load --serve --port 8801 data/derived/otp`. See `INTEGRATION.md` for the actual routing blocker; graph startup
-alone is not independent routing verification.
+`java -Xmx2G -jar <OTP.jar> --load --serve --port 8801 data/derived/otp`. See `REFERENCE_VALIDATION.md` and ARCH-001 for six exact transit matches and six
+explained access differences at the reviewed scope. Graph startup alone is not routing verification.
+
+Persistent collector: using the environment Python, `python scripts/install_collector.py`
+prepares a user service locally; add `--install` to install/start it, or `--remove` to
+remove it. The actual Mac LaunchAgent was installed and checked by the coordinator;
+Windows Task Scheduler XML/install commands are generated portably but await a real
+Windows check. Docker services now declare `restart:unless-stopped`; apply with
+`docker compose up -d postgres redpanda`. Docker Desktop itself must start after login.
+
+For analysis, use `python scripts/run_experiments.py --snapshot <id> --prepare-only`
+to freeze source targets, then choose a predefined scenario/budget. The fixed pair list
+is committed; its absent future stop ids remain unavailable, preserving 100 requests.
+`--sensitivity --budgets 2 --scenario stop_closure` compares 0/300/600-second additional
+bus directional running time with identical candidate IDs. Running calculations need
+a stable API process: avoid automatic code reload during jobs. Restarted jobs are
+explicitly failed and must be resubmitted under new ids.
+
+For verified offline artifacts and exact recomputation, follow `REPRODUCTION.md`.
+`RELEASE.md` describes candidate preparation and final evidence checks. The committed
+release configuration is a pending template. Populate candidate evidence only in an
+ignored runtime file and set `RESILIENCE_RELEASE_EVIDENCE` to its path after freezing
+a clean candidate revision; pending gates must never be changed without reviewed facts.

@@ -1,0 +1,479 @@
+{
+  "version": "pilot-od20-v1",
+  "created_at": "2026-10-02T11:46:16.041472+00:00",
+  "source_snapshot_id": "35f84816f6e208318ed8e49a",
+  "source_gtfs_sha256": "2614954a251786aa312a434551fe7000cb10a9b928a9d8f412a69a98c1d1f8da",
+  "selection_rule": "Ten source-active corridor pairs selected by stop geography and bus/rail access, then exact reverse pairs. Fairfield/Annerley bus origins; South Bank/CBD rail and bus destinations. Freeze before new versioned recovery outcomes. No passenger weights or outcome-based selection.",
+  "excluded_origin": "Fairfield rail platforms have no source-active service on 2026-10-02; preserved on map but excluded from primary pair selection",
+  "offset_seconds": [
+    0,
+    900,
+    1800,
+    2700,
+    3600
+  ],
+  "request_count": 100,
+  "primary_weight": 1,
+  "pairs": [
+    {
+      "pair_id": "od01",
+      "origin_stop_id": "3713",
+      "destination_stop_id": "18",
+      "origin": {
+        "stop_id": "3713",
+        "name": "Fairfield Rd at Brougham Street, stop 17A",
+        "latitude": -27.507813,
+        "longitude": 153.025013
+      },
+      "destination": {
+        "stop_id": "18",
+        "name": "Adelaide Street Stop 18 at City Hall",
+        "latitude": -27.469777,
+        "longitude": 153.023218
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od02",
+      "origin_stop_id": "3692",
+      "destination_stop_id": "19",
+      "origin": {
+        "stop_id": "3692",
+        "name": "Fairfield Rd at Fenton Street, stop 14a",
+        "latitude": -27.502503,
+        "longitude": 153.025946
+      },
+      "destination": {
+        "stop_id": "19",
+        "name": "Adelaide Street Stop 19 at City Hall",
+        "latitude": -27.469383,
+        "longitude": 153.023722
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od03",
+      "origin_stop_id": "3802",
+      "destination_stop_id": "600188",
+      "origin": {
+        "stop_id": "3802",
+        "name": "Fairfield Rd at Fairfield - Venner, stop 20",
+        "latitude": -27.511966,
+        "longitude": 153.021806
+      },
+      "destination": {
+        "stop_id": "600188",
+        "name": "South Bank station, platform 2",
+        "latitude": -27.481845,
+        "longitude": 153.022914
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od04",
+      "origin_stop_id": "3803",
+      "destination_stop_id": "600016",
+      "origin": {
+        "stop_id": "3803",
+        "name": "Fairfield Rd at Fairfield Park, stop 15a",
+        "latitude": -27.503876,
+        "longitude": 153.025895
+      },
+      "destination": {
+        "stop_id": "600016",
+        "name": "Central station, platform 3",
+        "latitude": -27.465737,
+        "longitude": 153.026028
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od05",
+      "origin_stop_id": "4878",
+      "destination_stop_id": "43",
+      "origin": {
+        "stop_id": "4878",
+        "name": "Park Rd near Fairfield Rd, stop 21",
+        "latitude": -27.51392,
+        "longitude": 153.020448
+      },
+      "destination": {
+        "stop_id": "43",
+        "name": "Adelaide Street Stop 43 near City Hall",
+        "latitude": -27.469025,
+        "longitude": 153.024347
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od06",
+      "origin_stop_id": "600188",
+      "destination_stop_id": "600016",
+      "origin": {
+        "stop_id": "600188",
+        "name": "South Bank station, platform 2",
+        "latitude": -27.481845,
+        "longitude": 153.022914
+      },
+      "destination": {
+        "stop_id": "600016",
+        "name": "Central station, platform 3",
+        "latitude": -27.465737,
+        "longitude": 153.026028
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od07",
+      "origin_stop_id": "600006",
+      "destination_stop_id": "600018",
+      "origin": {
+        "stop_id": "600006",
+        "name": "South Bank station, platform 1",
+        "latitude": -27.481832,
+        "longitude": 153.022995
+      },
+      "destination": {
+        "stop_id": "600018",
+        "name": "Central station, platform 1",
+        "latitude": -27.465841,
+        "longitude": 153.026069
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od08",
+      "origin_stop_id": "600189",
+      "destination_stop_id": "600019",
+      "origin": {
+        "stop_id": "600189",
+        "name": "South Bank station, platform 3",
+        "latitude": -27.48189,
+        "longitude": 153.02294
+      },
+      "destination": {
+        "stop_id": "600019",
+        "name": "Central station, platform 5",
+        "latitude": -27.465647,
+        "longitude": 153.025962
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od09",
+      "origin_stop_id": "600188",
+      "destination_stop_id": "18",
+      "origin": {
+        "stop_id": "600188",
+        "name": "South Bank station, platform 2",
+        "latitude": -27.481845,
+        "longitude": 153.022914
+      },
+      "destination": {
+        "stop_id": "18",
+        "name": "Adelaide Street Stop 18 at City Hall",
+        "latitude": -27.469777,
+        "longitude": 153.023218
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od10",
+      "origin_stop_id": "600006",
+      "destination_stop_id": "19",
+      "origin": {
+        "stop_id": "600006",
+        "name": "South Bank station, platform 1",
+        "latitude": -27.481832,
+        "longitude": 153.022995
+      },
+      "destination": {
+        "stop_id": "19",
+        "name": "Adelaide Street Stop 19 at City Hall",
+        "latitude": -27.469383,
+        "longitude": 153.023722
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od11",
+      "origin_stop_id": "18",
+      "destination_stop_id": "3713",
+      "origin": {
+        "stop_id": "18",
+        "name": "Adelaide Street Stop 18 at City Hall",
+        "latitude": -27.469777,
+        "longitude": 153.023218
+      },
+      "destination": {
+        "stop_id": "3713",
+        "name": "Fairfield Rd at Brougham Street, stop 17A",
+        "latitude": -27.507813,
+        "longitude": 153.025013
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od12",
+      "origin_stop_id": "19",
+      "destination_stop_id": "3692",
+      "origin": {
+        "stop_id": "19",
+        "name": "Adelaide Street Stop 19 at City Hall",
+        "latitude": -27.469383,
+        "longitude": 153.023722
+      },
+      "destination": {
+        "stop_id": "3692",
+        "name": "Fairfield Rd at Fenton Street, stop 14a",
+        "latitude": -27.502503,
+        "longitude": 153.025946
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od13",
+      "origin_stop_id": "600188",
+      "destination_stop_id": "3802",
+      "origin": {
+        "stop_id": "600188",
+        "name": "South Bank station, platform 2",
+        "latitude": -27.481845,
+        "longitude": 153.022914
+      },
+      "destination": {
+        "stop_id": "3802",
+        "name": "Fairfield Rd at Fairfield - Venner, stop 20",
+        "latitude": -27.511966,
+        "longitude": 153.021806
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od14",
+      "origin_stop_id": "600016",
+      "destination_stop_id": "3803",
+      "origin": {
+        "stop_id": "600016",
+        "name": "Central station, platform 3",
+        "latitude": -27.465737,
+        "longitude": 153.026028
+      },
+      "destination": {
+        "stop_id": "3803",
+        "name": "Fairfield Rd at Fairfield Park, stop 15a",
+        "latitude": -27.503876,
+        "longitude": 153.025895
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od15",
+      "origin_stop_id": "43",
+      "destination_stop_id": "4878",
+      "origin": {
+        "stop_id": "43",
+        "name": "Adelaide Street Stop 43 near City Hall",
+        "latitude": -27.469025,
+        "longitude": 153.024347
+      },
+      "destination": {
+        "stop_id": "4878",
+        "name": "Park Rd near Fairfield Rd, stop 21",
+        "latitude": -27.51392,
+        "longitude": 153.020448
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "bus"
+      ]
+    },
+    {
+      "pair_id": "od16",
+      "origin_stop_id": "600016",
+      "destination_stop_id": "600188",
+      "origin": {
+        "stop_id": "600016",
+        "name": "Central station, platform 3",
+        "latitude": -27.465737,
+        "longitude": 153.026028
+      },
+      "destination": {
+        "stop_id": "600188",
+        "name": "South Bank station, platform 2",
+        "latitude": -27.481845,
+        "longitude": 153.022914
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od17",
+      "origin_stop_id": "600018",
+      "destination_stop_id": "600006",
+      "origin": {
+        "stop_id": "600018",
+        "name": "Central station, platform 1",
+        "latitude": -27.465841,
+        "longitude": 153.026069
+      },
+      "destination": {
+        "stop_id": "600006",
+        "name": "South Bank station, platform 1",
+        "latitude": -27.481832,
+        "longitude": 153.022995
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od18",
+      "origin_stop_id": "600019",
+      "destination_stop_id": "600189",
+      "origin": {
+        "stop_id": "600019",
+        "name": "Central station, platform 5",
+        "latitude": -27.465647,
+        "longitude": 153.025962
+      },
+      "destination": {
+        "stop_id": "600189",
+        "name": "South Bank station, platform 3",
+        "latitude": -27.48189,
+        "longitude": 153.02294
+      },
+      "origin_modes": [
+        "rail"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od19",
+      "origin_stop_id": "18",
+      "destination_stop_id": "600188",
+      "origin": {
+        "stop_id": "18",
+        "name": "Adelaide Street Stop 18 at City Hall",
+        "latitude": -27.469777,
+        "longitude": 153.023218
+      },
+      "destination": {
+        "stop_id": "600188",
+        "name": "South Bank station, platform 2",
+        "latitude": -27.481845,
+        "longitude": 153.022914
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    },
+    {
+      "pair_id": "od20",
+      "origin_stop_id": "19",
+      "destination_stop_id": "600006",
+      "origin": {
+        "stop_id": "19",
+        "name": "Adelaide Street Stop 19 at City Hall",
+        "latitude": -27.469383,
+        "longitude": 153.023722
+      },
+      "destination": {
+        "stop_id": "600006",
+        "name": "South Bank station, platform 1",
+        "latitude": -27.481832,
+        "longitude": 153.022995
+      },
+      "origin_modes": [
+        "bus"
+      ],
+      "destination_modes": [
+        "rail"
+      ]
+    }
+  ]
+}

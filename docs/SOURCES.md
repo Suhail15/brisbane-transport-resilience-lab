@@ -1,6 +1,6 @@
 # Source register and publication review
 
-Reviewed 2026-10-02. Source receipts preserve exact retrieval times and SHA256 locally.
+Reviewed 2026-10-02; public-use terms rechecked 2026-10-03. Source receipts preserve exact retrieval times and SHA256 locally.
 
 | Source | Publisher | Source and terms | Licence / coverage |
 |---|---|---|---|
@@ -19,11 +19,20 @@ No basemap tile service is assumed or downloaded as part of this pipeline.
 [Translink open data terms](https://translink.com.au/about-translink/open-data/terms-and-conditions)
 require contact details be supplied/current. Their public-material provision addresses
 network/logo/images and requests intended use be submitted to marketing@translink.com.au;
-it allows three full business days for processing. No contact or approval has been
-sent/received by this task. This is an explicit release blocker for public network
+it allows three full business days for processing. On 2026-10-02, the user authorized
+a request in their own name. It was sent to marketing@translink.com.au and verified
+in the user's Sent mailbox, with current contact details supplied. Approval has not
+yet been received. This remains an explicit release blocker for public network
 material. Branding must remain independent; attribution is not endorsement. Source
 availability and a CC licence alone do not mark the project licence gate complete.
 
 Public release must document Translink contact/approval handling, OSM derivative data
 licensing, and the exact compact bundle contents. Raw archives are local and ignored.
-Licence release gate remains false in configs/release-evidence.json.
+Licence release gate remains false in configs/release-evidence.json. The sent request
+and private contact details are recorded under ignored data/runtime/ rather than in
+the public source repository.
+
+On 2026-10-03, the published open-data and separate terms pages were rechecked.
+Online licence information does not constitute an individual approval reply. The
+request remains pending; no approval record or release gate was changed. Exact
+retrieved terms and review hashes are retained privately under `data/runtime/`.

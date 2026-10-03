@@ -406,3 +406,60 @@ class RecoveryResult(Contract):
     optimality_proven: bool = False
     hypothetical: Literal[True] = True
     tie_break: str = "restore most, then minimize capped duration, then bus-hours, then sorted candidate ids"
+
+
+class AnalysisAssumptions(Contract):
+    bus_running_time_sensitivity_seconds: Literal[0, 300, 600] = 0
+    max_walk_m: Literal[600] = 600
+    walking_speed_m_s: Literal[1.2] = 1.2
+    max_stop_snap_m: Literal[30] = 30
+    walking_length_basis: Literal["actual_osm_edges"] = "actual_osm_edges"
+    transfer_slack_s: Literal[300] = 300
+    max_boardings: Literal[4] = 4
+    max_requests: Literal[500] = 500
+    primary_request_weight: Literal[1] = 1
+    reachability_horizon_s: Literal[3600] = 3600
+    duration_cap_s: Literal[5400] = 5400
+    activation_lead_s: Literal[600] = 600
+    bus_duty_s: Literal[7200] = 7200
+    terminal_turn_s: Literal[300] = 300
+    bus_hours_per_duty: Literal[2] = 2
+    max_candidates: Literal[12] = 12
+    max_buses: Literal[4] = 4
+    trip_updates_cadence_s: Literal[30] = 30
+    vehicle_positions_cadence_s: Literal[30] = 30
+    alerts_cadence_s: Literal[60] = 60
+    recording_window: Literal["weekdays 06:00-12:00 Australia/Brisbane"] = "weekdays 06:00-12:00 Australia/Brisbane"
+    fleet_availability: Literal["hypothetical_unverified"] = "hypothetical_unverified"
+    passenger_demand: Literal["unknown_equal_request_weights"] = "unknown_equal_request_weights"
+
+
+class RunMetadata(Contract):
+    schema_version: Literal[1] = 1
+    input_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    engine_version: Identifier
+    engine_code_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    journey_set_version: Identifier
+    request_set_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    scenario_set_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    candidate_set_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    budget_bus_hours: Literal[0, 2, 4, 8]
+    snapshot_id: Identifier
+    snapshot_at: datetime
+    snapshot_content_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    source_gtfs_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    source_osm_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")] | None = None
+    source_record_ids: Annotated[tuple[str, ...], Field(min_length=1)]
+    candidate_selection_version: Literal["affected-corridor-topology-v1"] = "affected-corridor-topology-v1"
+    objective_version: Identifier
+    search_method: Literal["greedy_bounded_swap", "exhaustive"] = "greedy_bounded_swap"
+    max_swap_evaluations: Annotated[int, Field(ge=0, le=4096)] = 128
+    assumptions: AnalysisAssumptions = Field(default_factory=AnalysisAssumptions)
+
+    @model_validator(mode="after")
+    def aware_snapshot(self) -> RunMetadata:
+        if self.snapshot_at.utcoffset() is None:
+            raise ValueError("run snapshot_at must include a timezone")
+        if len(set(self.source_record_ids)) != len(self.source_record_ids):
+            raise ValueError("run source record ids must be unique")
+        return self

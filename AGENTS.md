@@ -4,9 +4,9 @@
 
 Build the Brisbane Transport Resilience Lab: a replay and scenario tool for real bus and rail service around Fairfield and Annerley, South Bank, and Brisbane CBD. The replay will use sourced operating data. Disruptions and replacement-bus recovery plans are hypothetical scenarios constrained by documented service and network assumptions.
 
-This repository has initial project scaffolding and development work is underway. A real source archive has been acquired for audit but has not yet been ingested or validated. Do not describe coverage, analysis, validation, performance, or demo results as complete unless reproducible evidence is recorded. Keep planned work, source observations, derived measures, and hypothetical scenario assumptions clearly labeled.
+The core engine, source archive, local API and operational stores have been implemented. Real afternoon captures support development; complete morning recordings and public-release checks remain outstanding. Read the current task handoffs and release evidence before describing a milestone as complete. Keep planned work, source observations, derived measures, and hypothetical scenario assumptions clearly labeled.
 
-The accepted stack is Python, pandas, DuckDB, Parquet, Postgres/PostGIS, Redpanda, FastAPI, React with JavaScript and Vite, MapLibre, Docker Compose, and GitHub Actions. Platform and dependency details still require approved contracts and decisions. The project must work from one repository on macOS and Windows.
+The accepted stack is Python, pandas, DuckDB, Parquet, Postgres/PostGIS, Redpanda, FastAPI, React with JavaScript and Vite, MapLibre, Docker Compose, and GitHub Actions. Tested Python dependencies are pinned in `requirements.lock.txt`; frontend dependencies use a separate lock. Approved interfaces and analytical assumptions are in `docs/CONTRACTS.md`, `docs/METHODOLOGY.md` and `docs/DECISIONS.md`. The project uses one repository on macOS and Windows.
 
 ## Coordination and review
 

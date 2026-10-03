@@ -1,9 +1,33 @@
 {
+  "schema_version": 2,
+  "candidate_revision": null,
   "public_bundle_service_dates": [],
-  "independent_otp": {"passed": false, "evidence_ref": null},
-  "performance": {"passed": false, "evidence_ref": null},
-  "licences": {"passed": false, "evidence_ref": null},
-  "secrets": {"passed": false, "evidence_ref": null},
-  "ci": {"passed": false, "evidence_ref": null},
-  "static_demo": {"passed": false, "evidence_ref": null}
+  "independent_otp": {
+    "report": null,
+    "sha256": null
+  },
+  "performance": {
+    "report": null,
+    "sha256": null
+  },
+  "licences": {
+    "report": null,
+    "sha256": null
+  },
+  "secrets": {
+    "report": null,
+    "sha256": null
+  },
+  "ci": {
+    "report": null,
+    "sha256": null
+  },
+  "static_demo": {
+    "report": null,
+    "sha256": null
+  },
+  "public_artifacts": {
+    "report": null,
+    "sha256": null
+  }
 }

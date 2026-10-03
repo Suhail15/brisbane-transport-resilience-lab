@@ -40,3 +40,30 @@ Gap journal records `detected_at` separately from interval endpoints. Display re
 filters `detected_at <= as_of`, so a later-discovered sleep/fetch gap cannot alter an
 earlier frame. Legacy rows without detection time are conservatively available only
 at migration/import time; unknown past knowledge is never backdated.
+
+## Persistent recording, verified2026-10-02
+
+The coordinator installed the prepared user LaunchAgent using
+`python scripts/install_collector.py --install`. It verified running PID97810,
+repository working directory, virtual environment Python and empty error log.
+No prior forced collector process remained. Outside the recording window the agent
+was waiting and no sleep assertion was active. It runs independently of this chat
+and restarts on failure; a logged-in user session, open lid/network and functioning
+machine are still required. The installer generates local absolute paths at runtime,
+not in committed configuration. Remove with `--remove`.
+
+The collector holds an OS file lock for its entire lifetime; duplicate processes fail
+visibly and dead processes release the lock automatically. Mac `caffeinate -i -w PID`
+exists only weekdays06–12 and exits if the recorder dies. Windows uses a user Task
+Scheduler task prepared by the same installer, restarting failures and ignoring new
+instances. Its process sets the Windows sleep assertion only while the Brisbane
+recording window is active. Windows installation is documented but not exercised on
+this Mac. Neither mechanism can guarantee collection with a closed lid or power loss.
+
+Poll clocks now anchor to dispatch rather than adding HTTP response latency every
+cycle. Feeds have independent in-flight tasks, so one feed's retries cannot pause
+healthy feeds. Archive-reference outbox delivery runs on its own worker. Receipt-time
+coverage still exposes real latency/failure gaps; no catch-up records fill missed
+intervals. Startup during a window journals missing preceding receipts; heartbeat,
+PID/window/force status and failure logs persist under data/runtime. Replay gaps use
+actual detection time. Failed broker/PostGIS delivery remains in the durable outbox.

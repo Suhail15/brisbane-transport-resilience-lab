@@ -15,7 +15,7 @@ def main():
     sub.add_parser("store")
     sub.add_parser("coverage")
     sub.add_parser("audit-od")
-    export = sub.add_parser("export"); export.add_argument("--output", default="data/derived/demo"); export.add_argument("--public", action="store_true")
+    export = sub.add_parser("export"); export.add_argument("--output", default="data/derived/demo"); export.add_argument("--public", action="store_true"); export.add_argument("--candidate", action="store_true",help="Prepare eligible public projection locally without final artifact gates; never authorizes publication")
     sub.add_parser("release-gate")
     args = parser.parse_args()
     archive = Archive(settings.data_dir)
@@ -40,7 +40,7 @@ def main():
         print(json.dumps(coverage_report(archive), indent=2))
     elif args.command == "export":
         from .pipeline.bundle import export_bundle
-        print(export_bundle(archive, args.output, public=args.public))
+        print(export_bundle(archive, args.output, public=args.public,candidate=args.candidate))
     elif args.command == "release-gate":
         from .pipeline.coverage import release_gate
         result = release_gate(archive); print(json.dumps(result, indent=2)); raise SystemExit(0 if result["passed"] else 1)

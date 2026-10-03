@@ -1,7 +1,8 @@
 # Frozen engine contracts, version 1.1
 
 The source of truth is `services/resilience/contracts.py`, using Pydantic 2.
-Version 1.1 adds compatible candidate-selection and progress/cancellation exports.
+Version 1.1 adds compatible candidate-selection and progress/cancellation exports,
+plus immutable run provenance and analysis assumptions.
 Models are immutable, reject unknown fields, and serialize with `model_dump(mode="json")`.
 Import with `from resilience.contracts import ...` when `services` is on the Python path.
 The engine performs no I/O. Pipeline and API adapters supply validated models.
@@ -239,3 +240,117 @@ versioned GTFS network geometry and precomputed completed runs; full timetables 
 local. `/v1/network?snapshot_id=id` selects the snapshot's exact GTFS digest;
 `network/{gtfs_sha256}.geojson` and snapshot `network_url` preserve geometry versions.
 No missing source is replaced by a current network under an older replay.
+
+## Immutable analysis run metadata
+
+The API stores a frozen `RunMetadata` alongside each submitted run, before computing
+results. Engine exports identify the implemented policies: `ENGINE_VERSION` is
+`csa-resilience-1.1.0`, `JOURNEY_SET_VERSION` is `equal-weight-fixed-requests-v1`, and
+`OBJECTIVE_VERSION` is `restored-60m-duration-cap-90m-bus-hours-v1`. A separately
+persisted pilot pair list receives its own version; the request hash binds its actual
+expanded requests. Do not label an old run with the code currently installed.
+
+Required fields bind the complete normalized input (`input_sha256`), ordered expanded
+requests, ordered scenarios and actual candidate set (their respective SHA-256
+fields), budget, journey-set version, objective/search method and swap limit. They
+also bind snapshot id/cutoff/exact stored content hash, GTFS/OSM content hashes,
+eligible source record ids, engine version and code hash. Candidate selection is
+`affected-corridor-topology-v1`. `AnalysisAssumptions` records walking/transfer/query/
+horizon/duty limits, recording cadence/window, unknown demand, unverified hypothetical
+fleet availability, and `bus_running_time_sensitivity_seconds` in `{0, 300, 600}`.
+Zero is the ordinary analysis. Derived stress inputs require their own content hash
+and nominal snapshot/transform provenance in the immutable run input.
+
+Canonical JSON hashing uses `model_dump(mode="json")` data with all defaults and nulls
+retained, sorted object keys, compact separators, UTF-8, `ensure_ascii=False`, and
+`allow_nan=False`. Array order is retained; hash the empty list when a set is empty.
+The whole input includes source/snapshot references, ordered requests/scenarios/
+candidates, budget, method, search bounds, assumptions and any derived-input references.
+The engine code hash concatenates `services/resilience/contracts.py`, then sorted
+`services/resilience/engine/*.py`; for each file concatenate its repository-relative
+POSIX path, NUL, exact file bytes, NUL, then SHA-256 the resulting byte stream. Snapshot
+content hashing uses exact immutable stored bytes rather than a rewritten model.
+
+API results keep metrics at `result.plan.evaluation.metrics`; run metadata does not
+duplicate them. Cancelled runs publish no partial result. Older runs lacking these
+fields remain explicitly legacy/unversioned and cannot satisfy reproducible export
+gates. Recompute them under a new run id instead of backfilling historical code hashes.
+
+## Approved bounded experiment and sensitivity
+
+Persist 20 source-selected OD pairs, expanded at T+0/15/30/45/60 minutes to 100 fixed
+equal-weight requests. Select pilot geography, both directions and bus/rail/mixed
+access coverage before observing scenario results. Keep the same versioned pair list
+across dates. Inactive service stays unreachable in the denominator; an absent stop
+id is an explicit adapter unavailable-request outcome, never a fabricated stop or a
+silently dropped request. The engine continues to reject invalid stop references.
+Predefine trip cancellation, stop closure, an active rail corridor closure and bus
+delay examples. The first October 2 afternoon experiment is development evidence.
+Null intervention benefit is a valid result.
+
+Bus running-time sensitivity adds delta=0/300/600 seconds to each complete directional
+nominal run of positive duration D, using factor `(D + delta) / D`. For an incumbent
+bus trip, anchor at its first departure >=T and transform every event in that future
+suffix as `anchor + ceil((event - anchor) * factor)`. Earlier movements remain
+unchanged; a future full trip gains delta, while an in-progress trip stresses its
+remaining future suffix proportionally. Trips without a future suffix are unchanged.
+A zero-duration source run is not scaled and must be reported as unsupported for
+nonzero stress. Rail and actual OSM walking are unchanged.
+
+For each hypothetical bus direction, scale every arrival/departure offset using its
+full nominal D and the same formula. Activation/first departure and 300-second turns
+remain fixed; regenerate complete cycles and reject duties that no longer fit. Apply
+the stress transformation before the predefined scenarios, using derived copies of
+snapshot/pattern inputs. All policies use the same stressed inputs and fixed requests.
+Freeze nominal relevant candidate ids across sensitivity levels, revalidate their
+feasibility and report rejections. Start with one preselected disruption/budget at
+three levels. This is hypothetical running-time sensitivity, not observed delay.
+
+## Reproduction assets and compact browser bundles
+
+After release gates pass, a reviewed reproduction pack outside Git may be published
+as GitHub release assets. Include selected immutable normalized full snapshots,
+completed versioned runs/canonical inputs, source receipt/hash references, matching
+engine code/tag and derivation manifests. OSM-derived walking data must be separately
+available with ODbL attribution/licence and derivative-database obligations. Translink
+conditions apply to relevant normalized schedule content. Compact browser bundles
+retain lazy display/choices/geometry and precomputed results.
+
+`scripts/reproduce.py` must verify input and engine hashes, recompute fixed published
+runs and compare exact objectives/metrics, excluding execution timing. Upstream
+schedule changes cannot substitute new inputs. This approves preparation; no current
+asset is published before the existing release gates pass.
+
+## ARCH-002 approved integration packet
+
+`docs/tasks/ARCH-002.md` records the accepted local analytical scope and precise next
+packet. Engine/contracts and the versioned analysis/stress/journey-set implementation
+remain frozen. New modules add a compact verified experiment summary index, complete
+immutable final/input/snapshot/derived-artifact integrity guards, hashed release
+evidence and reproduction, plus the separately labelled monthly ticketing proxy.
+
+The secondary proxy never changes primary equal weights or recovery search. Exact
+source/operator/route/ordered direct-stop mapping and per-departure source time bins
+are required. Each pair/bin quantity is shared among its fixed departures; unknown
+or mixed/ambiguous joins are excluded with reasons. Weighted results use only the
+explicit mapped denominator, retain 60/90-minute rules and null empty denominators,
+and record sparse coverage and source/method hashes. See the task's complete formula,
+mapping evidence, limits and observable next-packet acceptance requirements.
+
+ARCH-003 clarifies the exact operator rule for route196: GTFS umbrella agency
+`Translink` does not equal OD operator `Transport for Brisbane`. A versioned reviewed
+crosswalk supported by official Council route196 and Translink operator/Council
+identification may bind only that public route/operator to the exact GTFS digest.
+Record its basis as `reviewed_official_route_crosswalk`, preserve evidence/actual
+retrieval hashes and times, and retain all direct-trip/stop-order/direction checks.
+Other unproved mappings remain unknown. See `docs/tasks/ARCH-003.md` for the primary
+sources, explicit combined-source inference and post-hoc method-evidence boundary.
+
+ARCH-003 additionally approves explicit local candidate preparation before final
+artifact-dependent acceptance. Candidate preparation enforces five complete windows,
+exactly three selected complete mornings, eligible sources/licence/publisher evidence,
+public data projection, legacy exclusions and immutable integrity. It leaves full
+publication authorization false. Final verification binds the exact candidate manifest
+hash to accepted public_artifacts evidence and checks all files and final gates.
+This breaks the generation/acceptance dependency without bypassing release conditions;
+no phase publishes remotely. Details are in the ARCH-003 task brief.

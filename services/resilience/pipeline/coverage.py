@@ -27,14 +27,17 @@ def coverage_report(archive):
     return {"timezone":"Australia/Brisbane","complete_weekday_windows":sum(w["complete"] for w in windows),"required_windows":5,"windows":windows,"recorded_failures":recorded_gaps,"definition":"Full six-hour receipt coverage for all three valid FULL_DATASET feeds; cadence +5 second maximum gap including window edges; excludes development captures","earliest_planned_complete_week":"2026-10-05 through 2026-10-09; future, not yet collected"}
 
 def release_gate(archive):
-    evidence_path=Path("configs/release-evidence.json")
-    evidence=json.loads(evidence_path.read_text()) if evidence_path.exists() else {}
+    from .evidence import release_evidence
+    evidence=release_evidence()
     coverage=coverage_report(archive)
     gates={"five_complete_windows":coverage["complete_weekday_windows"]>=5}
     complete_dates={w["service_date"] for w in coverage["windows"] if w["complete"]}
     bundle_dates=set(evidence.get("public_bundle_service_dates",[]))
-    gates["three_real_morning_bundles"]=len(bundle_dates)>=3 and bundle_dates<=complete_dates
-    for name in ("independent_otp","performance","licences","secrets","ci","static_demo"):
-        item=evidence.get(name,{})
-        gates[name]=item.get("passed") is True and bool(item.get("evidence_ref"))
-    return {"passed":all(gates.values()),"gates":gates,"blocking":[name for name,passed in gates.items() if not passed],"coverage":coverage,"public_release_authorized":False if not all(gates.values()) else True}
+    gates["three_real_morning_bundles"]=len(bundle_dates)==3 and bundle_dates<=complete_dates
+    from .evidence import evidence_check,candidate_revision,candidate_code_clean
+    revision=evidence.get('candidate_revision');reasons={}
+    gates['candidate_revision']=bool(revision) and revision==candidate_revision()
+    gates['candidate_code_clean']=candidate_code_clean()
+    for name in ("independent_otp","performance","licences","secrets","ci","static_demo","public_artifacts"):
+        gates[name],reasons[name]=evidence_check(evidence.get(name,{}),name=name,revision=revision)
+    return {"passed":all(gates.values()),"gates":gates,"blocking":[name for name,passed in gates.items() if not passed],"coverage":coverage,"evidence_failures":reasons,"public_release_authorized":False if not all(gates.values()) else True}

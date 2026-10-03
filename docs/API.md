@@ -89,3 +89,58 @@ latest acquired network. Static snapshot entries include `network_url` pointing 
 `networks/{gtfs_sha256}.geojson`; frontend must use that selected snapshot URL.
 `network.geojson` remains a latest-network convenience only. Each network source
 manifest exposes its exact GTFS digest and receipt timestamp.
+
+INT-002 adds immutable analysis provenance. Submitted experiments retain `metadata`
+(`RunMetadata`), canonical normalized `input`, and `unavailable_request_ids` alongside
+existing result/status fields. Extra POST fields are `journey_set_version` (default
+engine request version), `bus_running_time_sensitivity_seconds:0|300|600`, and
+`max_swap_evaluations` (default128). Nominal relevant candidates are selected once
+before stressing; their exact IDs are held fixed across sensitivity levels. Candidate,
+request, scenario, complete input, source, engine code and snapshot byte hashes bind
+the submitted run before recovery results are calculated.
+
+The source-selected `pilot-od20-v1` list is `configs/journey-set.v1.json`:20 pairs x
+five departures at T+0/15/30/45/60 minutes =100 equal-weight requests. Missing source
+stops return explicit unreachable outcomes and remain in all100-request denominators,
+with5400-second capped duration. They are never passed as invalid references to the
+engine. If every stop reference is unavailable, no valid journey or added duty is
+evaluated; the reported method names the configured policy and optimality remainsfalse.
+
+Canonical immutable files live locally under `data/processed/run-inputs` and
+`run-results`. Completed compact exports include `input_url` and `metadata_url` with
+matching immutable content. Older runs lacking metadata are labelled
+`legacy_unversioned:true,reproducible:false`, with no fabricated historical hashes;
+public export excludes them. Backend restart marks interrupted queued/running jobs
+failed and requires a new submission/run id.
+
+Network derivation v4 deduplicates only identical full coordinate arrays within the
+same public line/mode. Each display shape retains `route_ids,shape_ids,
+source_associations:[{route_id,shape_id}]` and `geometry_sha256`; singular ids remain
+compatible display examples. No coordinate simplification, route clipping or lost
+source associations occurs. Compact bundles use their selected `network_url` and
+omit the duplicate latest-network file.
+
+CompactINT-002 network files are deterministicgzip `.geojson.gz` (mtime0). Snapshot
+network_url points to the actual compressed file and manifest hashes its compressed
+bytes. Static adapters detectgzip magic then decompress only if needed, since hosting
+may already decode Content-Encoding. ParsedGeoJSON is unchanged. LocalAPI continues
+JSON with ordinary responsegzip middleware.
+
+## Verified experiment summaries (index version 1)
+
+`GET /v1/experiments` and static `experiments/index.json` return `{version:1,runs:[...]}`.
+Completed versioned summaries come from immutable verified final/input/metadata
+artifacts. Corruption produces an integrity error, rather than a substituted result.
+Each summary contains run/status/url/snapshot/created time, source snapshot cutoff,
+readable scenario names with original target IDs and intervals, available/used
+bus-hours, sensitivity seconds, journey-set version, request count, request/scenario/
+candidate hashes, assumptions, search method, objective/candidate selection versions,
+swap bound, aggregate metrics and objective. `hypothetical` is true. Legacy or
+unavailable historical code is explicitly non-reproducible; public summaries exclude it.
+Full itinerary legs remain lazy at `url`. Stop/trip endpoint labels use the same
+snapshot's actual names; an absent source name retains its ID.
+
+Comparisons must match snapshot/cutoff, journey version, request/scenario/candidate
+hashes, sensitivity assumptions, method/objective/candidate selection versions and
+swap bound. Budget alone is allowed to differ. A larger budget or a different stress
+level must not silently inherit another comparison group.

@@ -1,0 +1,22 @@
+{
+  "name": "brisbane-transport-resilience-lab-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "dev:static": "node scripts/dev-static.mjs",
+    "build": "vite build",
+    "build:static": "node scripts/build-static.mjs",
+    "test": "node --test ../tests/frontend/adapters.test.js"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.11.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.2"
+  }
+}

@@ -1,0 +1,31 @@
+name: Guarded Pages preparation
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_path:
+        description: Reviewed public bundle directory in the checked-out revision
+        required: true
+        default: release/public
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.lock.txt
+      - run: pip install -e . --no-deps
+      - name: Verify immutable assets and public eligibility
+        env:
+          BUNDLE_PATH: ${{ inputs.bundle_path }}
+        run: python scripts/verify_release.py --bundle "$BUNDLE_PATH"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend
+      # Deployment is intentionally absent until root approves the verified public revision.

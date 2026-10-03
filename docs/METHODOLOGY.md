@@ -158,7 +158,12 @@ Real-source route comparison uses **OpenTripPlanner (OTP)** with matched schedul
 time, walking speed and transfer assumptions; discrepancies must be explained,
 especially station access, OTP street linking, generalized cost and existing through
 service. An OTP server starting or schema introspection succeeding is not routing
-verification. The integrator records actual queries and comparison outcomes.
+verification. Actual queries and comparison outcomes are recorded in
+`docs/REFERENCE_VALIDATION.md`: six distinct identical transit paths and six
+source-specific access/path explanations, with zero unexplained cases. Raw exact
+counts remain 1/6 and 6/7; reviewed acceptance is confined to schedule-core timing
+and documented access differences. Walking coverage and GTFS-RT prediction accuracy
+are not established by these checks.
 
 OTP 2.10 combined build-and-serve was observed to fail with a populated graph and an
 empty Raptor routing index. Primary source inspection shows application construction
@@ -168,6 +173,17 @@ integrator's local runtime audit. Source: [OTPMain 2.10.0](https://github.com/op
 and [ConstructApplication 2.10.0](https://github.com/opentripplanner/OpenTripPlanner/blob/v2.10.0/application/src/main/java/org/opentripplanner/standalone/configure/ConstructApplication.java).
 
 ## UI, static export and release
+
+New analysis runs bind exact canonical input, request/scenario/candidate sets,
+immutable snapshot/source content, engine code/version and literal assumptions in
+`RunMetadata`; see `docs/CONTRACTS.md` for hash rules. Legacy runs are recomputed.
+The approved next experiment persists 20 source-selected OD pairs (100 requests)
+across dates, retaining missing-service/unavailable requests in the denominator.
+It predefines four disruption examples before seeing recovery results. A bounded
+0/300/600s bus running-time sensitivity proportionally scales future incumbent trip
+suffixes and hypothetical directional patterns, keeps activation/turns fixed and
+regenerates duty feasibility for all policies. Candidate ids stay nominal/fixed;
+derived input copies preserve raw snapshots. This is hypothetical sensitivity.
 
 The approved local UI has Replay, Scenarios, Recovery and Evidence views. Replay
 shows actual GTFS display shapes and eligible recorded vehicle positions with date,
@@ -185,4 +201,3 @@ It requires five complete weekday morning collections plus independent routing,
 performance, CI, secrets, static-demo, source attribution and licensing/contact/
 approval evidence. Translink terms and OSM derivative-data obligations require
 explicit review. Missing future recordings cannot be filled with synthetic data.
-
