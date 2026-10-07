@@ -181,6 +181,19 @@ OTP here means **OpenTripPlanner**, an independent routing engine.
 
 ## Data and release boundary
 
+### Operational recording margin (2026-10-07)
+
+The frozen `AnalysisAssumptions.*_cadence_s` fields retain the nominal recording
+policy targets of 30/30/60 seconds. They do not assert exact observed inter-receipt
+times. Operational collector policy `collector-v2` dispatches at 25/25/55 seconds
+to provide HTTP latency headroom, recorded explicitly in each new receipt's details
+and the collector heartbeat. The existing completeness ceilings remain 35/35/65
+seconds, including 06:00/12:00 window edges. Original receipt times, payloads and
+record identities are immutable. Increasing polling frequency cannot retrospectively
+repair a gap. Schedule preparation at 05:50 does not create qualifying feed receipts
+before 06:00, and pending GTFS downloads are never attached to prior feed receipts.
+See decision25 and ARCH-005 / INT-006 for implementation and acceptance scope.
+
 The preview is local. Public demo bundles must consist of three real recorded
 mornings selected only after five complete weekday 06:00–12:00 Brisbane collections
 and all release checks. No synthetic morning may substitute for a collection.

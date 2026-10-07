@@ -91,3 +91,49 @@ Owner: ARCH-001, GPT-6.1 Sol, reasoning max.
     final acceptance verifies static/CI evidence and the exact candidate manifest.
     Full authorization remains false until all gates pass. Generation cannot depend
     on acceptance of bytes it has not yet produced, and no preparation step publishes.
+25. **Collector reliability correction, coordinator approved 2026-10-07 (ARCH-005 / INT-006).**
+    The nominal recording/coverage policy stays 30 seconds for TripUpdates and
+    VehiclePositions, 60 seconds for Alerts, with the existing strict receipt-gap
+    limits of 35/35/65 seconds. The operational collector dispatches every 25/25/55
+    seconds to provide latency headroom. Frozen analysis assumption cadence fields
+    describe the nominal coverage policy; each new source receipt and heartbeat
+    records the actual dispatch policy separately. Receipt times remain the replay
+    authority. This does not change source freshness rules or retrospectively
+    qualify a failed window.
+    Fixed-phase monotonic deadlines skip elapsed slots without burst catch-up and
+    permit only one in-flight request per feed. Completed HTTP responses retain
+    their real receipt times, including late/out-of-order responses. Record actual
+    request attempts and elapsed time; do not fabricate success after retry failure.
+    Weekday preparation begins at 05:50 Brisbane: obtain the idle-sleep assertion
+    while awake and refresh GTFS on a separate worker. Schedule refreshes and the
+    existing outbox worker cannot block other feeds' dispatch. A pending new
+    schedule never supplies its digest to an earlier receipt. Warmup requests are
+    not qualifying morning feed captures. The collector waits precisely for the
+    06:00 boundary and drains already dispatched requests after 12:00 without
+    creating new qualifying requests outside the recording window.
+    Live heartbeat diagnostics and a post-window coverage report expose remaining
+    failures; they cannot override the unchanged release gate. Idle protection
+    cannot wake a sleeping machine or defeat closed-lid/manual sleep. Prepare
+    bounded, owned weekday 05:50 wake events separately; installation requires
+    macOS administrator authorization. Keep global power settings and existing
+    user wake/sleep schedules intact. No paid/cloud deployment is authorized here.
+    The collector's own LaunchAgent gets a 300-second exit timeout so its graceful
+    SIGTERM handler can drain ordinary feed/schedule requests before restart. This
+    is shutdown headroom, not a bound on all possible network/database stalls.
+    Independent review found a restart/missed-slot dispatch immediately before the
+    next fixed phase could otherwise yield a compressed request pair. Enforce
+    minimum actual per-feed dispatch spacing of interval minus five seconds
+    (20/20/50 seconds); consume too-close phase slots without submitting requests.
+    Ordinary half-second scheduler jitter retains the fixed phase. Startup gap
+    journaling measures only missing time inside the current morning, from the
+    later of 06:00 and the prior valid receipt, and never records a zero-length
+    missing-window claim at an exact 06:00 restart.
+    Evidence: on 7 October a 30.190457-second dispatch interval plus HTTP/receipt
+    latency growth from 0.274174 to 7.066556 seconds produced a 36.982839-second
+    gap. All-day dispatch intervals averaged 30.301842 seconds. The first morning
+    feed receipt followed a blocking timetable refresh at 06:00:27.500791.
+    Translink's official open-data page and linked terms were reviewed on 7 October;
+    neither specifies a client polling minimum/rate. GTFS best-practice 30-second
+    refresh guidance concerns feed producers, and is not a consumer rate limit.
+    The modest increase is bounded to the configured weekday window and preserves
+    private archiving. Network/power/upstream failures can still prevent a pass.

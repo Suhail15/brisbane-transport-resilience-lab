@@ -6,21 +6,52 @@ from pathlib import Path
 import plistlib
 import subprocess
 import sys
+import time
 import xml.etree.ElementTree as ET
 
 ROOT=Path(__file__).resolve().parents[1];LABEL='au.brisbane.transport-resilience.collector'
 p=argparse.ArgumentParser();p.add_argument('--install',action='store_true');p.add_argument('--remove',action='store_true');args=p.parse_args()
 logs=ROOT/'data/runtime';logs.mkdir(parents=True,exist_ok=True)
+
+def bootstrap_launch_agent(command, *, run=None, sleep=None):
+    """Retry a macOS GUI bootstrap once only when launchctl reports exit 5."""
+    run = run or subprocess.run
+    sleep = sleep or time.sleep
+
+    def execute():
+        return run(command, check=False, capture_output=True, text=True)
+
+    first = execute()
+    if first.returncode == 0:
+        return first
+    if first.returncode != 5:
+        raise subprocess.CalledProcessError(
+            first.returncode, command, output=first.stdout, stderr=first.stderr
+        )
+
+    sleep(0.5)
+    second = execute()
+    if second.returncode == 0:
+        return second
+    combined_stdout = "\n".join(value for value in (first.stdout, second.stdout) if value)
+    combined_stderr = "\n".join(value for value in (first.stderr, second.stderr) if value)
+    raise subprocess.CalledProcessError(
+        second.returncode, command, output=combined_stdout, stderr=combined_stderr
+    )
+
 if sys.platform=='darwin':
     path=Path.home()/'Library/LaunchAgents'/f'{LABEL}.plist'
-    definition={'Label':LABEL,'ProgramArguments':[sys.executable,'-m','resilience.cli','collect'],'WorkingDirectory':str(ROOT),'EnvironmentVariables':{'PYTHONPATH':str(ROOT/'services'),'PYTHONUNBUFFERED':'1'},'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':30,'StandardOutPath':str(logs/'scheduled-collector.log'),'StandardErrorPath':str(logs/'scheduled-collector-error.log'),'ProcessType':'Background'}
+    definition={'Label':LABEL,'ProgramArguments':[sys.executable,'-m','resilience.cli','collect'],'WorkingDirectory':str(ROOT),'EnvironmentVariables':{'PYTHONPATH':str(ROOT/'services'),'PYTHONUNBUFFERED':'1'},'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':30,'ExitTimeOut':300,'StandardOutPath':str(logs/'scheduled-collector.log'),'StandardErrorPath':str(logs/'scheduled-collector-error.log'),'ProcessType':'Background'}
     staging=logs/'collector-launchagent.plist';staging.write_bytes(plistlib.dumps(definition))
     if args.remove:
         subprocess.run(['launchctl','bootout',f'gui/{os.getuid()}/{LABEL}'],check=False)
         if path.exists():path.unlink()
     elif args.install:
-        path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(staging.read_bytes());subprocess.run(['launchctl','bootstrap',f'gui/{os.getuid()}',str(path)],check=True)
-    print({'prepared':str(staging),'installed_path':str(path),'install_requested':args.install,'scheduled':'Process waits outside weekdays06–12; awake assertion exists only inside window'})
+        path.parent.mkdir(parents=True,exist_ok=True)
+        subprocess.run(['launchctl','bootout',f'gui/{os.getuid()}/{LABEL}'],check=False)
+        path.write_bytes(staging.read_bytes())
+        bootstrap_launch_agent(['launchctl','bootstrap',f'gui/{os.getuid()}',str(path)])
+    print({'prepared':str(staging),'installed_path':str(path),'install_requested':args.install,'scheduled':'Weekday05:50 preparation/awake assertion and separate GTFS refresh; feeds06–12 at25/25/55 seconds; no privileged wake installation'})
 elif os.name=='nt':
     # User logon starts a single portable recorder; OS task restarts failed process.
     ns='http://schemas.microsoft.com/windows/2004/02/mit/task';ET.register_namespace('',ns)
@@ -31,5 +62,5 @@ elif os.name=='nt':
     path=logs/'collector-task.xml';ET.ElementTree(task).write(path,encoding='utf-16',xml_declaration=True)
     if args.remove:subprocess.run(['schtasks','/Delete','/TN',LABEL,'/F'],check=True)
     elif args.install:subprocess.run(['schtasks','/Create','/TN',LABEL,'/XML',str(path),'/F'],check=True);subprocess.run(['schtasks','/Run','/TN',LABEL],check=True)
-    print({'prepared':str(path),'install_requested':args.install,'scheduled':'Logged-in user process waits outside weekdays06–12; window-only Windows execution-state sleep assertion'})
+    print({'prepared':str(path),'install_requested':args.install,'scheduled':'Logged-in user process prepares/holds sleep assertion weekdays05:50–12; feeds06–12 at25/25/55 seconds; already dispatched requests drain after12'})
 else:raise SystemExit('Automatic service installer supports macOS/Windows; use a user process manager on Linux')

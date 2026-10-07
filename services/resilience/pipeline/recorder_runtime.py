@@ -1,4 +1,4 @@
-"""One recorder per archive; prevent idle sleep only during the collection window."""
+"""One recorder per archive; prevent idle sleep during preparation, collection and request drain."""
 from contextlib import contextmanager
 import os
 from pathlib import Path

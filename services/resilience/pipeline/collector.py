@@ -1,90 +1,320 @@
 from __future__ import annotations
+
+import json
+import os
+import signal
+import threading
 import time
-from datetime import datetime,timezone
-from .recorder_runtime import recorder_lock,WindowAwake
-from .files import atomic_write
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
+
 import httpx
+
 from .archive import Archive, FEEDS, GTFS_URL, utcnow
+from .collector_schedule import (
+    BRISBANE, POLICY, POLL_SECONDS, MIN_DISPATCH_SECONDS, in_window, next_boundary,
+    next_phase_deadline, preparation_active, window_start,
+)
+from .files import atomic_write
+from .recorder_runtime import recorder_lock, WindowAwake
 
-BRISBANE = ZoneInfo("Australia/Brisbane")
 
-def in_window(now):
-    local = now.astimezone(BRISBANE)
-    return local.weekday() < 5 and 6 <= local.hour < 12
+def latest_schedule(archive, as_of):
+    # Bounded indexed lookup; a pending/uncommitted download is unavailable.
+    with archive.connect() as db:
+        row = db.execute(
+            "SELECT * FROM receipts WHERE feed='GTFS' AND status='valid' "
+            "AND received_at<=? ORDER BY received_at DESC LIMIT 1",
+            (as_of.astimezone(timezone.utc).isoformat(),),
+        ).fetchone()
+    return dict(row) if row else None
+
 
 def fetch_feed(archive, name, gtfs_digest, client):
     started = utcnow()
+    started_mono = time.monotonic()
+    attempts = []
     for attempt in range(3):
+        attempted_at = utcnow()
+        attempt_mono = time.monotonic()
         try:
             response = client.get(FEEDS[name])
             response.raise_for_status()
-            return archive.append(name, response.content, utcnow(), FEEDS[name], gtfs_digest, {"request_started_at": started.isoformat(), "http_status": response.status_code, "development_capture": not in_window(started)})
         except (httpx.HTTPError, OSError) as exc:
+            attempts.append({"attempt": attempt + 1, "started_at": attempted_at.isoformat(),
+                             "elapsed_seconds": time.monotonic() - attempt_mono,
+                             "error": str(exc)[:500]})
             if attempt == 2:
-                archive.gap(started, utcnow(), name, f"fetch failed after 3 attempts: {exc}")
-                return {"feed": name, "status": "failed", "error": str(exc)}
+                ended = utcnow()
+                archive.gap(started, ended, name, f"fetch failed after 3 attempts: {str(exc)[:500]}")
+                return {"feed": name, "status": "failed", "error": str(exc)[:500],
+                        "request_started_at": started.isoformat(), "attempts": attempts,
+                        "request_elapsed_seconds": time.monotonic() - started_mono,
+                        "collector_policy": POLICY, "poll_interval_seconds": POLL_SECONDS[name],
+                        "minimum_dispatch_spacing_seconds": MIN_DISPATCH_SECONDS[name]}
             time.sleep(2 ** attempt)
+            continue
+        received = utcnow()
+        attempts.append({"attempt": attempt + 1, "started_at": attempted_at.isoformat(),
+                         "elapsed_seconds": time.monotonic() - attempt_mono,
+                         "http_status": response.status_code})
+        schedule = latest_schedule(archive, received)
+        return archive.append(name, response.content, received, FEEDS[name],
+                              schedule["sha256"] if schedule else None,
+                              {"request_started_at": started.isoformat(),
+                               "request_elapsed_seconds": time.monotonic() - started_mono,
+                               "attempts": attempts, "http_status": response.status_code,
+                               "collector_policy": POLICY, "poll_interval_seconds": POLL_SECONDS[name],
+                               "minimum_dispatch_spacing_seconds": MIN_DISPATCH_SECONDS[name],
+                               "development_capture": not in_window(started) or not in_window(received)})
+
 
 def refresh_schedule(archive):
+    started = utcnow()
+    started_mono = time.monotonic()
     with httpx.Client(timeout=120, follow_redirects=True) as client:
-        response = client.get(GTFS_URL); response.raise_for_status()
-        return archive.append("GTFS", response.content, utcnow(), GTFS_URL, details={"licence": "CC BY 4.0", "publisher": "Translink"})
+        response = client.get(GTFS_URL)
+        response.raise_for_status()
+        received = utcnow()
+        return archive.append("GTFS", response.content, received, GTFS_URL,
+                              details={"licence": "CC BY 4.0", "publisher": "Translink",
+                                       "request_started_at": started.isoformat(),
+                                       "request_elapsed_seconds": time.monotonic() - started_mono,
+                                       "collector_policy": POLICY})
+
+
+def audit_window(archive, service_date):
+    from .coverage import coverage_report
+    report = coverage_report(archive)
+    path = archive.root / "runtime" / f"coverage-{service_date}.json"
+    atomic_write(path, json.dumps(report, indent=2))
+    return {"coverage_report": str(path), "service_date": service_date,
+            "complete_weekday_windows": report["complete_weekday_windows"]}
+
+
+class CollectorLoop:
+    """Finite tick seam: workers do I/O; the scheduler only drains and dispatches."""
+    def __init__(self, archive, feed_pool, schedule_pool, outbox_pool, client, *,
+                 audit_pool=None, awake=None, force=False, clock=utcnow,
+                 monotonic=time.monotonic, flush=None):
+        if flush is None:
+            from ..db import flush_outbox
+            flush = flush_outbox
+        self.archive, self.feed_pool, self.schedule_pool = archive, feed_pool, schedule_pool
+        self.outbox_pool, self.audit_pool, self.client = outbox_pool, audit_pool or outbox_pool, client
+        self.awake, self.force, self.clock, self.monotonic, self.flush = awake, force, clock, monotonic, flush
+        self.inflight, self.due, self.feed_health = {}, {}, {}
+        self.dispatch_times = {}
+        self.last_dispatch = {}
+        self.last_valid_receipts = {}
+        self.last_valid_gaps = {}
+        with archive.connect() as db:
+            for name in FEEDS:
+                row = db.execute("SELECT received_at FROM receipts WHERE feed=? AND status='valid' "
+                                 "AND received_at<=? ORDER BY received_at DESC LIMIT 1",
+                                 (name, clock().astimezone(timezone.utc).isoformat())).fetchone()
+                if row:
+                    self.last_valid_receipts[name] = row[0]
+        self.schedule_job = self.outbox_job = self.audit_job = None
+        self.schedule = latest_schedule(archive, clock())
+        self.refresh_retry_at = 0.0
+        self.prepared_day = self.active_day = None
+        self.pending_audits = []
+        initial_local = clock().astimezone(BRISBANE)
+        if initial_local.weekday() < 5 and initial_local.hour >= 12:
+            self.pending_audits.append(initial_local.date().isoformat())
+        self.last_clock = clock()
+        self.last_status = float('-inf')
+        self.schedule_error = None
+        if in_window(self.last_clock):
+            start = window_start(self.last_clock).astimezone(timezone.utc)
+            with archive.connect() as db:
+                previous = db.execute("SELECT received_at FROM receipts WHERE feed='TripUpdates' AND status='valid' "
+                                      "AND received_at<=? ORDER BY received_at DESC LIMIT 1",
+                                      (self.last_clock.astimezone(timezone.utc).isoformat(),)).fetchone()
+            previous_time = datetime.fromisoformat(previous[0]).astimezone(timezone.utc) if previous else start
+            gap_start = max(start, previous_time)
+            if (self.last_clock - gap_start).total_seconds() > 35:
+                archive.gap(gap_start, self.last_clock, "all",
+                            "Recorder startup missing preceding window receipts")
+
+    def _drain(self, now, mono):
+        for name in list(self.inflight):
+            future = self.inflight[name]
+            if not future.done():
+                continue
+            self.inflight.pop(name)
+            self.dispatch_times.pop(name, None)
+            try:
+                result = future.result()
+                details = json.loads(result.get("details", "{}"))
+                if result.get("status") == "valid" and result.get("received_at"):
+                    previous = self.last_valid_receipts.get(name)
+                    received = result["received_at"]
+                    if previous and received >= previous:
+                        self.last_valid_gaps[name] = max(0, (datetime.fromisoformat(received) -
+                                                           datetime.fromisoformat(previous)).total_seconds())
+                    if previous is None or received >= previous:
+                        self.last_valid_receipts[name] = received
+                self.feed_health[name] = {"status": result.get("status"),
+                    "received_at": result.get("received_at"),
+                    "request_started_at": details.get("request_started_at", result.get("request_started_at")),
+                    "request_elapsed_seconds": details.get("request_elapsed_seconds", result.get("request_elapsed_seconds")),
+                    "attempts": details.get("attempts", result.get("attempts", [])),
+                    "error": result.get("error")}
+            except Exception as exc:
+                self.feed_health[name] = {"status": "failed", "error": str(exc)[:500]}
+                self.archive.gap(now, now, name, f"feed worker failed: {str(exc)[:500]}")
+            print({"feed": name, **self.feed_health[name]}, flush=True)
+        if self.schedule_job is not None and self.schedule_job.done():
+            try:
+                self.schedule = self.schedule_job.result()
+                self.schedule_error = None
+            except Exception as exc:
+                self.schedule_error = str(exc)[:500]
+                self.archive.gap(self.refresh_started, now, "GTFS", f"schedule refresh failed: {self.schedule_error}")
+                self.refresh_retry_at = mono + 300
+                print({"schedule_refresh_failed": self.schedule_error}, flush=True)
+            self.schedule_job = None
+        for attr in ("outbox_job", "audit_job"):
+            future = getattr(self, attr)
+            if future is not None and future.done():
+                try:
+                    result = future.result()
+                    if attr == "audit_job":
+                        print(result, flush=True)
+                except Exception as exc:
+                    print({"worker": attr, "error": str(exc)[:500]}, flush=True)
+                setattr(self, attr, None)
+
+    def tick(self, now=None, monotonic_now=None):
+        now = self.clock() if now is None else now
+        mono = self.monotonic() if monotonic_now is None else monotonic_now
+        active, preparing = in_window(now), preparation_active(now)
+        if self.awake:
+            self.awake.set(preparing or bool(self.inflight))
+        self._drain(now, mono)
+        if (now - self.last_clock).total_seconds() > 45 and active:
+            self.archive.gap(self.last_clock, now, "all", "scheduler discontinuity, possibly laptop sleep")
+        self.last_clock = now
+        day = now.astimezone(BRISBANE).date().isoformat()
+        if self.active_day and (not active or self.active_day != day):
+            self.pending_audits.append(self.active_day)
+            self.active_day = None
+            self.due.clear()
+        if active and self.active_day != day:
+            self.active_day = day
+            # Map 06:00 wall boundary to monotonic phase, including a mid-window restart.
+            phase = mono - (now - window_start(now)).total_seconds()
+            self.due = {name: phase for name in FEEDS}
+        if self.force and not self.due:
+            self.due = {name: mono for name in FEEDS}
+        if preparing or self.force:
+            stale = not self.schedule or (now - datetime.fromisoformat(self.schedule["received_at"])).total_seconds() >= 86400
+            warmup = preparing and self.prepared_day != day
+            if self.schedule_job is None and mono >= self.refresh_retry_at and (stale or warmup or self.schedule_error):
+                self.refresh_started = now
+                self.schedule_job = self.schedule_pool.submit(refresh_schedule, self.archive)
+                self.prepared_day = day
+        if active or self.force:
+            for name in FEEDS:
+                if mono >= self.due[name]:
+                    # Consume every elapsed slot even if its worker is busy.
+                    self.due[name] = next_phase_deadline(self.due[name], POLL_SECONDS[name], mono)
+                    # A delayed/initial dispatch near the next phase must not burst.
+                    spaced = name not in self.last_dispatch or mono - self.last_dispatch[name] >= MIN_DISPATCH_SECONDS[name]
+                    if name not in self.inflight and spaced:
+                        digest = self.schedule["sha256"] if self.schedule else None
+                        self.inflight[name] = self.feed_pool.submit(fetch_feed, self.archive, name, digest, self.client)
+                        self.dispatch_times[name] = {"started_at": now.isoformat(), "monotonic": mono}
+                        self.last_dispatch[name] = mono
+            if self.outbox_job is None:
+                self.outbox_job = self.outbox_pool.submit(self.flush, self.archive)
+        if self.pending_audits and not self.inflight and self.audit_job is None:
+            completed_day = self.pending_audits.pop(0)
+            if not (self.archive.root / "runtime" / f"coverage-{completed_day}.json").exists():
+                self.audit_job = self.audit_pool.submit(audit_window, self.archive, completed_day)
+        if mono - self.last_status >= 5 or not active:
+            health = {}
+            for name in FEEDS:
+                valid_at = self.last_valid_receipts.get(name)
+                age = max(0, (now - datetime.fromisoformat(valid_at)).total_seconds()) if valid_at else None
+                limit = 65 if name == "Alerts" else 35
+                inflight_age = max(0, mono - self.dispatch_times[name]["monotonic"]) if name in self.dispatch_times else None
+                warning = None
+                if active or self.force:
+                    if age is None:
+                        warning = "no_valid_receipt"
+                    elif age > limit:
+                        warning = "valid_receipt_age_exceeds_limit"
+                    if inflight_age is not None and inflight_age > limit:
+                        warning = "inflight_elapsed_exceeds_limit"
+                health[name] = {**self.feed_health.get(name, {}),
+                    "last_valid_received_at": valid_at, "receipt_age_seconds": age,
+                    "last_valid_inter_receipt_gap_seconds": self.last_valid_gaps.get(name),
+                    "max_allowed_gap_seconds": limit, "warning": warning}
+            available_schedule = self.schedule if self.schedule and datetime.fromisoformat(self.schedule["received_at"]) <= now else None
+            status = {"pid": os.getpid(), "heartbeat_at": now.isoformat(),
+                      "window_active": active, "preparation_active": preparing, "force": self.force,
+                      "collector_policy": POLICY, "poll_intervals_seconds": POLL_SECONDS,
+                      "minimum_dispatch_spacing_seconds": MIN_DISPATCH_SECONDS,
+                      "schedule_refresh_pending": self.schedule_job is not None,
+                      "available_gtfs_sha256": available_schedule["sha256"] if available_schedule else None,
+                      "schedule_refresh_error": self.schedule_error,
+                      "inflight_feeds": list(self.inflight),
+                      "inflight_requests": {name: {"dispatched_at": value["started_at"],
+                          "elapsed_seconds": max(0, mono - value["monotonic"])}
+                          for name, value in self.dispatch_times.items()}, "feeds": health}
+            atomic_write(self.archive.root / "runtime" / "collector-status.json", json.dumps(status))
+            self.last_status = mono
+        boundary_wait = (next_boundary(now) - now).total_seconds()
+        return min(.5 if active or self.force or self.inflight else 30, max(0, boundary_wait))
+
+    def close(self):
+        # Do not cancel or lose responses already dispatched at the window boundary.
+        for future in self.inflight.values():
+            try:
+                future.result()
+            except Exception:
+                pass  # _drain records worker failures and still processes other feeds.
+        if self.schedule_job is not None:
+            try:
+                self.schedule_job.result()
+            except Exception:
+                pass  # _drain records the refresh failure with its real end time.
+        self._drain(self.clock(), self.monotonic())
+
 
 def collect(archive: Archive, *, force=False, once=False):
     with recorder_lock(archive.root):
-        awake=WindowAwake()
-        try:return _collect(archive,force=force,once=once,awake=awake)
-        finally:awake.close()
+        awake = WindowAwake()
+        stop_event = threading.Event()
+        previous_term = None
+        if threading.current_thread() is threading.main_thread():
+            previous_term = signal.getsignal(signal.SIGTERM)
+            signal.signal(signal.SIGTERM, lambda signum, frame: stop_event.set())
+        try:
+            return _collect(archive, force=force, once=once, awake=awake, stop_event=stop_event)
+        finally:
+            awake.close()
+            if previous_term is not None:
+                signal.signal(signal.SIGTERM, previous_term)
 
-def _collect(archive: Archive, *, force=False, once=False,awake=None):
-    """Weekday 06-12 recorder. Force captures remain explicitly development-only."""
-    due = {name: 0.0 for name in FEEDS}
-    inflight={}
-    last_clock = utcnow()
-    previous=archive.latest("TripUpdates",last_clock)
-    if in_window(last_clock) and (not previous or (last_clock-datetime.fromisoformat(previous["received_at"])).total_seconds()>35):
-        start=datetime.combine(last_clock.astimezone(BRISBANE).date(),datetime.min.time().replace(hour=6),BRISBANE).astimezone(timezone.utc)
-        archive.gap(max(start,datetime.fromisoformat(previous["received_at"])) if previous else start,last_clock,"all","Recorder startup missing preceding window receipts")
-    from ..db import flush_outbox
-    outbox_pool=ThreadPoolExecutor(max_workers=1);outbox_job=None
-    with httpx.Client(timeout=20, follow_redirects=True) as client, ThreadPoolExecutor(max_workers=3) as pool:
-        while True:
-            now = utcnow()
-            if awake:awake.set(in_window(now))
-            atomic_write(archive.root/"runtime"/"collector-status.json",__import__("json").dumps({"pid":__import__("os").getpid(),"heartbeat_at":now.isoformat(),"window_active":in_window(now),"force":force}))
-            if (now - last_clock).total_seconds() > 45 and in_window(now):
-                archive.gap(last_clock, now, "all", "scheduler discontinuity, possibly laptop sleep")
-            last_clock = now
-            if force or in_window(now):
-                schedule = archive.latest("GTFS", now)
-                if not schedule or (now - __import__("datetime").datetime.fromisoformat(schedule["received_at"])).total_seconds() >= 86400:
-                    try:
-                        schedule = refresh_schedule(archive)
-                    except Exception as exc:
-                        archive.gap(now, utcnow(), "GTFS", f"schedule refresh failed: {exc}")
-                digest = schedule["sha256"] if schedule else None
-                for name in list(inflight):
-                    if inflight[name].done():
-                        print(inflight.pop(name).result(),flush=True)
-                pending = [name for name in FEEDS if name not in inflight and time.monotonic() >= due[name]]
 
-                for name in pending:
-                    cadence=60 if name=="Alerts" else 30
-                    # Anchor to dispatch time rather than response completion; avoid accumulating request latency.
-                    dispatch=time.monotonic()
-                    due[name]=max(due[name]+cadence,dispatch+cadence)
-                    inflight[name]=pool.submit(fetch_feed,archive,name,digest,client)
-
-                if outbox_job is None or outbox_job.done():
-                    if outbox_job is not None:
-                        try:outbox_job.result()
-                        except Exception as exc:print({"outbox_pending":True,"error":str(exc)},flush=True)
-                    outbox_job=outbox_pool.submit(flush_outbox,archive)
-            if once:
-                for future in inflight.values():print(future.result(),flush=True)
-                outbox_pool.shutdown(wait=True)
-                return
-            time.sleep(.5 if force or in_window(now) else 30)
+def _collect(archive: Archive, *, force=False, once=False, awake=None, stop_event=None):
+    stop_event = stop_event or threading.Event()
+    with httpx.Client(timeout=20, follow_redirects=True) as client, \
+            ThreadPoolExecutor(max_workers=3) as feed_pool, \
+            ThreadPoolExecutor(max_workers=1) as schedule_pool, \
+            ThreadPoolExecutor(max_workers=1) as outbox_pool, \
+            ThreadPoolExecutor(max_workers=1) as audit_pool:
+        loop = CollectorLoop(archive, feed_pool, schedule_pool, outbox_pool, client,
+                             audit_pool=audit_pool, awake=awake, force=force)
+        try:
+            while not stop_event.is_set():
+                delay = loop.tick()
+                if once:
+                    return
+                stop_event.wait(delay)
+        finally:
+            loop.close()
