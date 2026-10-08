@@ -204,3 +204,7 @@ Owner: ARCH-001, GPT-6.1 Sol, reasoning max.
     development captures, clean cross-platform CI and installed service settings.
     Public release remains gated. Network, shared-storage, lid and power outages
     can still invalidate a morning; no future pass is claimed.
+    Windows CI on 1335dae found seven error-report path assertions using native
+    backslashes. Root approves POSIX serialization of the reported relative
+    pending path, retaining every corruption/recovery assertion and validation.
+    The OS-specific filesystem path remains a Path; only its report form changes.

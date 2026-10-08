@@ -198,7 +198,7 @@ class Archive:
                 pending.unlink()
                 report["recovered"].append(identity)
             except Exception as exc:
-                report["errors"].append({"pending_path": str(pending.relative_to(self.root)), "error": str(exc)[:500]})
+                report["errors"].append({"pending_path": pending.relative_to(self.root).as_posix(), "error": str(exc)[:500]})
         return report
 
     def get(self, record_id):

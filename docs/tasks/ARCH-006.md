@@ -2,7 +2,7 @@
 
 - Task ID: ARCH-006
 - Title: independently design and review further recording resilience
-- Status: independent design and implementation review complete; accepted for coordinator verification/deployment
+- Status: source review accepted; Windows CI follow-up verification pending
 - Owner: architecture reviewer
 - Reviewer: root coordinator
 
@@ -12,6 +12,8 @@ Explicitly assigned and coordinator-confirmed dispatch: GPT-6.1 Sol, max
 reasoning, for the initial independent design and final review. No subagents were
 spawned. Tools do not expose independent serving-model identity; this records the
 requested assignment and coordinator confirmation, not backend introspection.
+The Windows CI follow-up was also explicitly assigned GPT-6.1 Sol/max, with no
+additional agents spawned.
 
 ## Approved specification and decisions
 
@@ -229,6 +231,30 @@ counterfactual margins, test evidence and live deployment evidence.
   evidence remain required. This acceptance authorizes coordinator integration
   and operational verification; it does not establish deployment, a future
   complete morning or public release.
+- **Windows CI follow-up: independently diagnosed, fresh CI pending.** Commit
+  `1335dae` Windows job log is saved under ignored
+  `data/runtime/reliability-2026-10-08/windows-ci-failure.log`. It reports seven
+  failures, 106 passes and two skips in 17.91 seconds. All seven are the
+  `test_invalid_pending_evidence_stays_visible_and_does_not_rewrite_receipt`
+  variants: unsafe_path, windows_path, identity, payload_hash, event_at,
+  entity_metadata and external_symlink. Their
+  preceding assertions confirm no recovered capture and one error; each fails
+  solely because recovery error.pending_path contains native backslashes while
+  the unchanged test requires portable forward slashes. Later preservation
+  assertions are not reached in that failed run and require the fresh CI result.
+  Root reports macOS/Linux/frontend jobs passed; this reviewer read the actual
+  Windows log rather than inferring success from local tests.
+- **Windows fix accepted in source, tests preserved.** Root approved the narrow
+  replacement of `str(pending.relative_to(self.root))` with
+  `pending.relative_to(self.root).as_posix()`. The current source contains exactly
+  that correction. Independently demonstrated PureWindowsPath native backslashes
+  versus portable `runtime/pending-captures/abc.json`; `.as_posix()` matches POSIX
+  output on either host. Native filesystem access and resolved containment remain
+  host Path operations; POSIX/Windows absolute-path grammar checks, symlink
+  containment, hashes, lock ownership, timestamps, protobuf/GTFS validation and
+  corrupt-evidence retention are unchanged. No corruption assertion is weakened
+  or skipped. Fresh Windows CI for the corrected commit remains coordinator-owned
+  and pending; local grammar demonstration is not a native Windows execution.
 
 ## Escalation issues
 
@@ -237,6 +263,11 @@ accepted. Root's later duplicate-publication regression was corrected using the
 reviewed per-identity serialization and original metadata authority; its bounded
 checks passed independently. No required implementation blocker remains. No
 production file was edited here; only this handoff is owned by this review.
+The later Windows job exposed the recovery diagnostic separator bug described
+above. Its root-approved one-line source correction is accepted; cross-platform
+CI acceptance is reopened until the corrected commit's Windows job passes. The
+earlier strict quality and historical 0/5 evidence cannot be overridden by a CI
+retry or reporting-format correction.
 
 Network phase timeouts are not total-response deadlines; a progressing slow body
 or explicit provider delay can occupy a worker longer. Shared disk/SQLite stalls,

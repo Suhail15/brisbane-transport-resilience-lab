@@ -168,8 +168,8 @@ A separate 65-second real-feed check produced twelve valid, nonempty development
 captures. They were retained with their original timestamps and bytes in the
 primary archive to keep mirrored references resolvable; they cannot qualify a
 morning. All 4,460 earlier receipts remain unchanged. Strict completeness is still
-zero of five mornings. Four future weekday 05:50 wake events are confirmed for
-October 9, 12, 13 and 14. The October 15 addition was not installed because native
-administrator authentication was cancelled. No global power setting changed.
+zero of five mornings. All five future weekday 05:50 wake events are confirmed for
+October 9, 12, 13, 14 and 15 after native administrator authentication and schedule
+readback. No global power setting changed.
 Private remote CI is checked against the pushed commit; source release gates still
 apply. See OPS-002 and the ignored runtime evidence for this deployment's readbacks.
