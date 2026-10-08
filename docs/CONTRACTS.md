@@ -194,6 +194,16 @@ repair a gap. Schedule preparation at 05:50 does not create qualifying feed rece
 before 06:00, and pending GTFS downloads are never attached to prior feed receipts.
 See decision25 and ARCH-005 / INT-006 for implementation and acceptance scope.
 
+Decision26 approves the further operational `collector-v3` policy: 15/15/45
+seconds, minimum submission spacing 10/10/40, with the same frozen nominal
+analysis fields and strict 35/35/65 completeness ceilings. New receipt details
+may include phase/submission/task/HTTP timing, but persistence completion stays
+outside immutable receipt metadata. Asynchronous gap persistence must retain the
+original observation's `detected_at`. A durable pending-capture envelope may
+finish an interrupted archive transaction under the collector lock, preserving
+the original received time, content identity and already committed journal row.
+It cannot introduce a new upstream observation or qualify missing coverage.
+
 The preview is local. Public demo bundles must consist of three real recorded
 mornings selected only after five complete weekday 06:00–12:00 Brisbane collections
 and all release checks. No synthetic morning may substitute for a collection.

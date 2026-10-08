@@ -36,26 +36,41 @@ def persist_run(run):
     with psycopg.connect(settings.database_url) as db:
         db.execute("INSERT INTO experiment_runs VALUES (%s,%s,%s::jsonb) ON CONFLICT(run_id) DO UPDATE SET status=excluded.status,document=excluded.document", (run["run_id"],run["status"],json.dumps(run)))
 
+def outbox_connect():
+    """Only mirror delivery receives these limits; analytical callers are unchanged."""
+    return psycopg.connect(settings.database_url, connect_timeout=3,
+                           options="-c statement_timeout=3000 -c lock_timeout=1000")
+
+
 def flush_outbox(archive):
-    initialize()
+    # Remote work never holds a SQLite transaction open.
+    with outbox_connect() as db:
+        db.execute(DDL)
     producer = Producer({"bootstrap.servers":settings.broker,"message.timeout.ms":3000,"socket.timeout.ms":3000,"enable.idempotence":True})
     sent = 0
+    error = None
     with archive.connect() as journal:
-        rows = journal.execute("SELECT r.* FROM receipts r JOIN outbox o USING(record_id) WHERE o.sent_at IS NULL ORDER BY received_at LIMIT 100").fetchall()
+        rows = journal.execute("SELECT r.* FROM receipts r JOIN outbox o USING(record_id) WHERE o.sent_at IS NULL ORDER BY received_at LIMIT 25").fetchall()
     for row in rows:
         receipt = dict(row)
         try:
-            with psycopg.connect(settings.database_url, connect_timeout=3) as db:
+            with outbox_connect() as db:
                 db.execute("INSERT INTO source_receipts VALUES (%s,%s,%s,%s,%s,%s::jsonb) ON CONFLICT DO NOTHING", (receipt["record_id"],receipt["feed"],receipt["received_at"],receipt["event_at"],receipt["sha256"],json.dumps(receipt)))
             errors = []
             producer.produce("resilience.source-references.v1", key=receipt["record_id"], value=json.dumps(receipt), on_delivery=lambda err,msg: errors.append(str(err)) if err else None)
             remaining = producer.flush(4)
-            if remaining or errors: raise RuntimeError(str(errors or "broker delivery timed out"))
+            if remaining or errors:
+                raise RuntimeError(str(errors or "broker delivery timed out"))
             with archive.connect() as journal:
                 journal.execute("UPDATE outbox SET sent_at=?,attempts=attempts+1,last_error=NULL WHERE record_id=?", (datetime.now(timezone.utc).isoformat(),receipt["record_id"]))
             sent += 1
         except Exception as exc:
+            error = str(exc)[:500]
             with archive.connect() as journal:
-                journal.execute("UPDATE outbox SET attempts=attempts+1,last_error=? WHERE record_id=?", (str(exc),receipt["record_id"]))
+                journal.execute("UPDATE outbox SET attempts=attempts+1,last_error=? WHERE record_id=?", (error,receipt["record_id"]))
             break
-    return {"published":sent,"remaining":len(rows)-sent,"delivery":"at least once; consumer deduplicates record_id"}
+    with archive.connect() as journal:
+        pending = journal.execute("SELECT count(*) FROM outbox WHERE sent_at IS NULL").fetchone()[0]
+    return {"published":sent,"remaining":len(rows)-sent,"remaining_in_batch":len(rows)-sent,
+            "pending_references":pending,"failed":error is not None,
+            "error":error,"delivery":"at least once; consumer deduplicates record_id"}

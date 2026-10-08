@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from resilience.pipeline.recorder_runtime import recorder_lock
+from resilience.pipeline import recorder_runtime
 from resilience.pipeline.collector import in_window
 
 def test_single_recorder_lock_and_release(tmp_path):
@@ -66,6 +67,7 @@ def test_launchagent_bootstrap_retries_exit_five_once_after_half_second(tmp_path
     assert sleep_calls == [0.5]
     staged = plistlib.loads((project / "data" / "runtime" / "collector-launchagent.plist").read_bytes())
     assert staged["ExitTimeOut"] == 300
+    assert staged["ProcessType"] == "Standard"
 
 
 @pytest.mark.parametrize(
@@ -95,3 +97,59 @@ def test_launchagent_bootstrap_permanent_errors_propagate_captured_diagnostics(
     assert raised.value.output == expected_stdout
     assert raised.value.stderr == expected_stderr
     assert sleep_calls == ([0.5] if expected_calls == 2 else [])
+
+
+def test_awake_assertion_restarts_dead_owned_process_and_reports_health(monkeypatch):
+    processes = []
+    commands = []
+
+    class FakeProcess:
+        def __init__(self, command, **kwargs):
+            self.command = command
+            self.kwargs = kwargs
+            self.returncode = None
+            self.terminated = False
+            processes.append(self)
+            commands.append((command, kwargs))
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            self.terminated = True
+            self.returncode = 0
+
+        def wait(self, timeout):
+            assert timeout == 5
+            return self.returncode
+
+    monkeypatch.setattr(recorder_runtime.sys, "platform", "darwin")
+    monkeypatch.setattr(recorder_runtime.subprocess, "Popen", FakeProcess)
+    awake = recorder_runtime.WindowAwake()
+
+    awake.set(True)
+    first = processes[0]
+    assert awake.health() == {
+        "requested_active": True,
+        "assertion_alive": True,
+        "last_error": None,
+        "restart_count": 0,
+    }
+    first.returncode = 9
+
+    # Repeatedly requesting the same state must still notice and replace a dead
+    # process owned by this collector.
+    awake.set(True)
+    assert len(processes) == 2
+    assert awake.health()["assertion_alive"]
+    assert awake.health()["restart_count"] == 1
+    assert "exited: 9" in awake.health()["last_error"]
+    assert all(command[0] == ["/usr/bin/caffeinate", "-i", "-w", str(os.getpid())]
+               for command in commands)
+    assert all(command[1]["stdout"] == subprocess.DEVNULL
+               and command[1]["stderr"] == subprocess.DEVNULL for command in commands)
+
+    awake.close()
+    assert processes[1].terminated
+    assert awake.health()["requested_active"] is False
+    assert awake.health()["assertion_alive"] is False

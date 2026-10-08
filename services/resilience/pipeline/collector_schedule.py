@@ -3,9 +3,9 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 BRISBANE = ZoneInfo("Australia/Brisbane")
-POLL_SECONDS = {"TripUpdates": 25, "VehiclePositions": 25, "Alerts": 55}
+POLL_SECONDS = {"TripUpdates": 15, "VehiclePositions": 15, "Alerts": 45}
 MIN_DISPATCH_SECONDS = {name: cadence - 5 for name, cadence in POLL_SECONDS.items()}
-POLICY = "collector-v2"
+POLICY = "collector-v3"
 
 
 def in_window(now):

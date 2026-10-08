@@ -137,3 +137,70 @@ Owner: ARCH-001, GPT-6.1 Sol, reasoning max.
     refresh guidance concerns feed producers, and is not a consumer rate limit.
     The modest increase is bounded to the configured weekday window and preserves
     private archiving. Network/power/upstream failures can still prevent a pass.
+26. **Further collection resilience, coordinator approved 2026-10-08 (ARCH-006 / INT-007 / QA-003).**
+    Operating policy `collector-v3` uses fixed phases of 15/15/45 seconds with
+    minimum submissions spaced 10/10/40 seconds apart. Keep one in-flight task per
+    feed through archive completion, skip missed slots and preserve all successful
+    responses, including slow ones and those received after noon. Keep existing
+    20-second network phase timeouts and the single HTTP retry owner (at most three
+    attempts); no quality-driven cancellation, invented receipts or overlapping
+    duplicate requests. Nominal analysis fields remain 30/30/60, strict receipt-gap
+    limits remain 35/35/65, and five complete six-hour mornings remain required.
+    Independent review measured October 8 task-start intervals 28.310826/28.397149
+    seconds and response-latency growth 7.641214/7.455599, giving the actual
+    35.952040/35.852748 gaps. With the same measured differences, the shorter
+    cadence gives approximately 25.952/25.853-second counterfactual gaps. This is
+    engineering headroom, not a historical or prospective coverage pass.
+    Configure the shared HTTP client with 90-second keepalive expiry, three total
+    and three idle connections, and no extra transport retry layer. The installed
+    client's default expiry was five seconds. Published Translink open-data terms
+    reviewed on October 8 contain no client polling minimum; this is not unlimited
+    capacity authorization. Normal request volume becomes 3,360 per six-hour
+    window, approximately 58.4% above the previous 2,121. Respect explicit provider
+    Retry-After signals if present; any resulting missing coverage remains visible.
+    Sources: https://translink.com.au/about-translink/open-data/terms-and-conditions
+    and https://www.python-httpx.org/advanced/resource-limits/.
+    Move coalesced heartbeat writes and retained diagnostic logs/gaps to one
+    separate telemetry worker. Capture a gap's detection time in the observer and
+    pass it through optional `Archive.gap(..., detected_at=...)`; queue delay must
+    not rewrite replay availability. Add actual phase/submission/task/HTTP timing;
+    return persistence-completion durations in health/logs, never mutate a receipt.
+    Bound outbox-only Postgres connection/statement/lock waits and back off failed
+    delivery. Keep failed source references durable and feed archive writes intact.
+    Root ratifies batches of at most 25 references, five-second success pacing,
+    the existing within-batch remaining alias and total unsent backlog reporting.
+    Smaller delivery turns allow health/backoff checkpoints; they do not cap the
+    durable backlog or guarantee drain within the observed shutdown allowance.
+    Explicit narrow archive ownership exception: before journal commit, save a
+    pending-capture envelope beside the immutable content-addressed object. Clear
+    it only after journal/outbox and receipt-file completion. Recover envelopes
+    only on collector startup under the recorder lock, without upstream requests;
+    validate identity, timestamp, safe relative object path and payload hash. An
+    already committed journal row remains authoritative. Preserve corrupt pending
+    evidence and report errors; never rewrite an original receipt or payload to
+    hide corruption. This addresses process interruption between durable stages,
+    not bytes never durably stored or every hardware/power failure.
+    The collector's own macOS job uses Standard rather than Background process
+    classification; this does not guarantee scheduling priority. Keep existing
+    global power settings. Check the collector-owned sleep assertion's health and
+    retry a dead assertion process without suppressing errors. Preserve the actual
+    reported shutdown allowance and expose disk/worker/telemetry health. Extend
+    only individually owned wake events needed for five future weekday mornings;
+    native administrator authentication is still required for additional events.
+    Final review approves two narrow correctness guards: recheck actual time
+    immediately before each feed submission so a tick crossing noon cannot start
+    new normal-window work; and validate any non-null pending timetable digest
+    against a valid archived GTFS receipt available by the original receipt time.
+    A missing digest remains unknown. Previously dispatched work still drains.
+    Full-suite verification exposed concurrent publication of the same capture
+    racing with pending-envelope removal. Serialize only identical archive-root /
+    record-ID publications using bounded process-local keyed lock ownership and
+    clear completed envelopes idempotently. Different captures remain parallel;
+    object/journal/receipt durability and existing immutable rows remain intact.
+    Freeze all 4,460 pre-change rows/receipt files and 4,430 payloads by hashes.
+    Verify both recorded timing failures, jitter, blocked workers/storage/broker/
+    telemetry, HTTP retries, slow successful bodies, process-crash recovery,
+    original gap detection cutoffs, window/restart/calendar behaviour, live
+    development captures, clean cross-platform CI and installed service settings.
+    Public release remains gated. Network, shared-storage, lid and power outages
+    can still invalidate a morning; no future pass is claimed.

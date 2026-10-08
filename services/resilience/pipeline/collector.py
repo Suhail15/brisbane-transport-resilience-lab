@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import signal
+import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -17,6 +20,7 @@ from .collector_schedule import (
 )
 from .files import atomic_write
 from .recorder_runtime import recorder_lock, WindowAwake
+from .collector_telemetry import AsyncTelemetry
 
 
 def latest_schedule(archive, as_of):
@@ -30,9 +34,36 @@ def latest_schedule(archive, as_of):
     return dict(row) if row else None
 
 
-def fetch_feed(archive, name, gtfs_digest, client):
+def feed_client():
+    return httpx.Client(timeout=20, follow_redirects=True,
+                        limits=httpx.Limits(max_connections=3, max_keepalive_connections=3,
+                                            keepalive_expiry=90))
+
+
+def retry_after_seconds(response, now):
+    value = getattr(response, "headers", {}).get("Retry-After") if response is not None else None
+    if value is None:
+        return 0.0
+    try:
+        seconds = float(value)
+        return seconds if math.isfinite(seconds) and seconds >= 0 else 0.0
+    except (ValueError, TypeError):
+        try:
+            deadline = parsedate_to_datetime(value)
+            if deadline.utcoffset() is None:
+                return 0.0
+            return max(0.0, (deadline.astimezone(timezone.utc) - now).total_seconds())
+        except (ValueError, TypeError, OverflowError):
+            return 0.0
+
+
+def fetch_feed(archive, name, gtfs_digest, client, *, dispatch=None, telemetry=None):
     started = utcnow()
     started_mono = time.monotonic()
+    timing = dict(dispatch or {})
+    if "submitted_monotonic" in timing:
+        timing["task_start_delay_seconds"] = max(0, started_mono - timing.pop("submitted_monotonic"))
+    timing["task_started_at"] = started.isoformat()
     attempts = []
     for attempt in range(3):
         attempted_at = utcnow()
@@ -41,32 +72,47 @@ def fetch_feed(archive, name, gtfs_digest, client):
             response = client.get(FEEDS[name])
             response.raise_for_status()
         except (httpx.HTTPError, OSError) as exc:
+            elapsed = time.monotonic() - attempt_mono
+            retry_delay = max(2 ** attempt, retry_after_seconds(getattr(exc, "response", None), attempted_at))
             attempts.append({"attempt": attempt + 1, "started_at": attempted_at.isoformat(),
-                             "elapsed_seconds": time.monotonic() - attempt_mono,
+                             "elapsed_seconds": elapsed, "retry_after_seconds": retry_delay,
                              "error": str(exc)[:500]})
             if attempt == 2:
                 ended = utcnow()
-                archive.gap(started, ended, name, f"fetch failed after 3 attempts: {str(exc)[:500]}")
+                reason = f"fetch failed after 3 attempts: {str(exc)[:500]}"
+                if telemetry:
+                    telemetry.gap(started, ended, name, reason, detected_at=ended)
+                else:
+                    archive.gap(started, ended, name, reason, detected_at=ended)
                 return {"feed": name, "status": "failed", "error": str(exc)[:500],
                         "request_started_at": started.isoformat(), "attempts": attempts,
                         "request_elapsed_seconds": time.monotonic() - started_mono,
+                        "retry_not_before": (ended.timestamp() + retry_after_seconds(getattr(exc, "response", None), ended)),
                         "collector_policy": POLICY, "poll_interval_seconds": POLL_SECONDS[name],
                         "minimum_dispatch_spacing_seconds": MIN_DISPATCH_SECONDS[name]}
-            time.sleep(2 ** attempt)
+            time.sleep(retry_delay)
             continue
         received = utcnow()
+        http_finished_mono = time.monotonic()
         attempts.append({"attempt": attempt + 1, "started_at": attempted_at.isoformat(),
-                         "elapsed_seconds": time.monotonic() - attempt_mono,
+                         "elapsed_seconds": http_finished_mono - attempt_mono,
                          "http_status": response.status_code})
         schedule = latest_schedule(archive, received)
-        return archive.append(name, response.content, received, FEEDS[name],
+        persistence_started_mono = time.monotonic()
+        receipt = archive.append(name, response.content, received, FEEDS[name],
                               schedule["sha256"] if schedule else None,
-                              {"request_started_at": started.isoformat(),
-                               "request_elapsed_seconds": time.monotonic() - started_mono,
+                              {**timing, "request_started_at": started.isoformat(),
+                               "request_elapsed_seconds": http_finished_mono - started_mono,
+                               "schedule_lookup_seconds": persistence_started_mono - http_finished_mono,
                                "attempts": attempts, "http_status": response.status_code,
                                "collector_policy": POLICY, "poll_interval_seconds": POLL_SECONDS[name],
                                "minimum_dispatch_spacing_seconds": MIN_DISPATCH_SECONDS[name],
                                "development_capture": not in_window(started) or not in_window(received)})
+        completed_mono = time.monotonic()
+        # Return-only diagnostics: immutable receipt metadata never gains later knowledge.
+        return {**receipt, "runtime_timing": {
+            "persistence_elapsed_seconds": completed_mono - persistence_started_mono,
+            "task_elapsed_seconds": completed_mono - started_mono}}
 
 
 def refresh_schedule(archive):
@@ -96,10 +142,12 @@ class CollectorLoop:
     """Finite tick seam: workers do I/O; the scheduler only drains and dispatches."""
     def __init__(self, archive, feed_pool, schedule_pool, outbox_pool, client, *,
                  audit_pool=None, awake=None, force=False, clock=utcnow,
-                 monotonic=time.monotonic, flush=None):
+                 monotonic=time.monotonic, flush=None, telemetry=None):
         if flush is None:
             from ..db import flush_outbox
             flush = flush_outbox
+        self.telemetry = telemetry or AsyncTelemetry(archive)
+        self.owns_telemetry = telemetry is None
         self.archive, self.feed_pool, self.schedule_pool = archive, feed_pool, schedule_pool
         self.outbox_pool, self.audit_pool, self.client = outbox_pool, audit_pool or outbox_pool, client
         self.awake, self.force, self.clock, self.monotonic, self.flush = awake, force, clock, monotonic, flush
@@ -126,6 +174,10 @@ class CollectorLoop:
         self.last_clock = clock()
         self.last_status = float('-inf')
         self.schedule_error = None
+        self.outbox_retry_at = 0.0
+        self.outbox_failures = 0
+        self.outbox_health = {}
+        self.retry_not_before = {}
         if in_window(self.last_clock):
             start = window_start(self.last_clock).astimezone(timezone.utc)
             with archive.connect() as db:
@@ -135,8 +187,8 @@ class CollectorLoop:
             previous_time = datetime.fromisoformat(previous[0]).astimezone(timezone.utc) if previous else start
             gap_start = max(start, previous_time)
             if (self.last_clock - gap_start).total_seconds() > 35:
-                archive.gap(gap_start, self.last_clock, "all",
-                            "Recorder startup missing preceding window receipts")
+                self.telemetry.gap(gap_start, self.last_clock, "all",
+                            "Recorder startup missing preceding window receipts", detected_at=self.last_clock)
 
     def _drain(self, now, mono):
         for name in list(self.inflight):
@@ -156,7 +208,12 @@ class CollectorLoop:
                                                            datetime.fromisoformat(previous)).total_seconds())
                     if previous is None or received >= previous:
                         self.last_valid_receipts[name] = received
-                self.feed_health[name] = {"status": result.get("status"),
+                self.retry_not_before[name] = result.get("retry_not_before", 0)
+                self.feed_health[name] = {"runtime_timing": result.get("runtime_timing", {}),
+                    "phase_at": details.get("phase_at"), "submitted_at": details.get("submitted_at"),
+                    "scheduler_delay_seconds": details.get("scheduler_delay_seconds"),
+                    "task_start_delay_seconds": details.get("task_start_delay_seconds"),
+                    "status": result.get("status"),
                     "received_at": result.get("received_at"),
                     "request_started_at": details.get("request_started_at", result.get("request_started_at")),
                     "request_elapsed_seconds": details.get("request_elapsed_seconds", result.get("request_elapsed_seconds")),
@@ -164,17 +221,17 @@ class CollectorLoop:
                     "error": result.get("error")}
             except Exception as exc:
                 self.feed_health[name] = {"status": "failed", "error": str(exc)[:500]}
-                self.archive.gap(now, now, name, f"feed worker failed: {str(exc)[:500]}")
-            print({"feed": name, **self.feed_health[name]}, flush=True)
+                self.telemetry.gap(now, now, name, f"feed worker failed: {str(exc)[:500]}", detected_at=now)
+            self.telemetry.log({"feed": name, **self.feed_health[name]})
         if self.schedule_job is not None and self.schedule_job.done():
             try:
                 self.schedule = self.schedule_job.result()
                 self.schedule_error = None
             except Exception as exc:
                 self.schedule_error = str(exc)[:500]
-                self.archive.gap(self.refresh_started, now, "GTFS", f"schedule refresh failed: {self.schedule_error}")
+                self.telemetry.gap(self.refresh_started, now, "GTFS", f"schedule refresh failed: {self.schedule_error}", detected_at=now)
                 self.refresh_retry_at = mono + 300
-                print({"schedule_refresh_failed": self.schedule_error}, flush=True)
+                self.telemetry.log({"schedule_refresh_failed": self.schedule_error})
             self.schedule_job = None
         for attr in ("outbox_job", "audit_job"):
             future = getattr(self, attr)
@@ -182,20 +239,36 @@ class CollectorLoop:
                 try:
                     result = future.result()
                     if attr == "audit_job":
-                        print(result, flush=True)
+                        self.telemetry.log(result)
+                    else:
+                        self.outbox_health = result or {}
+                        if self.outbox_health.get("failed"):
+                            self.outbox_failures += 1
+                            self.outbox_retry_at = mono + min(300, 5 * 2 ** min(self.outbox_failures - 1, 6))
+                        else:
+                            self.outbox_failures = 0
+                            self.outbox_retry_at = mono + 5
                 except Exception as exc:
-                    print({"worker": attr, "error": str(exc)[:500]}, flush=True)
+                    self.telemetry.log({"worker": attr, "error": str(exc)[:500]})
+                    if attr == "outbox_job":
+                        self.outbox_failures += 1
+                        self.outbox_retry_at = mono + min(300, 5 * 2 ** min(self.outbox_failures - 1, 6))
+                        self.outbox_health = {"failed": True, "error": str(exc)[:500]}
                 setattr(self, attr, None)
 
     def tick(self, now=None, monotonic_now=None):
+        controlled_tick = now is not None or monotonic_now is not None
         now = self.clock() if now is None else now
         mono = self.monotonic() if monotonic_now is None else monotonic_now
         active, preparing = in_window(now), preparation_active(now)
         if self.awake:
-            self.awake.set(preparing or bool(self.inflight))
+            try:
+                self.awake.set(preparing or bool(self.inflight))
+            except (OSError, subprocess.SubprocessError) as exc:
+                self.telemetry.log({"awake_error": str(exc)[:500]})
         self._drain(now, mono)
         if (now - self.last_clock).total_seconds() > 45 and active:
-            self.archive.gap(self.last_clock, now, "all", "scheduler discontinuity, possibly laptop sleep")
+            self.telemetry.gap(self.last_clock, now, "all", "scheduler discontinuity, possibly laptop sleep", detected_at=now)
         self.last_clock = now
         day = now.astimezone(BRISBANE).date().isoformat()
         if self.active_day and (not active or self.active_day != day):
@@ -218,17 +291,29 @@ class CollectorLoop:
                 self.prepared_day = day
         if active or self.force:
             for name in FEEDS:
-                if mono >= self.due[name]:
-                    # Consume every elapsed slot even if its worker is busy.
-                    self.due[name] = next_phase_deadline(self.due[name], POLL_SECONDS[name], mono)
+                # Recheck actual time after any preceding work and before admission.
+                # Explicit tick snapshots remain deterministic for fault tests.
+                submitted_at = now if controlled_tick else self.clock()
+                submitted_mono = mono if controlled_tick else self.monotonic()
+                if submitted_mono >= self.due[name]:
+                    phase_deadline = self.due[name] + int((submitted_mono - self.due[name]) // POLL_SECONDS[name]) * POLL_SECONDS[name]
+                    # Consume every elapsed slot even if busy or now outside window.
+                    self.due[name] = next_phase_deadline(self.due[name], POLL_SECONDS[name], submitted_mono)
                     # A delayed/initial dispatch near the next phase must not burst.
-                    spaced = name not in self.last_dispatch or mono - self.last_dispatch[name] >= MIN_DISPATCH_SECONDS[name]
-                    if name not in self.inflight and spaced:
+                    spaced = name not in self.last_dispatch or submitted_mono - self.last_dispatch[name] >= MIN_DISPATCH_SECONDS[name]
+                    eligible = self.force or in_window(submitted_at)
+                    if (eligible and name not in self.inflight and spaced
+                            and submitted_at.timestamp() >= self.retry_not_before.get(name, 0)):
                         digest = self.schedule["sha256"] if self.schedule else None
-                        self.inflight[name] = self.feed_pool.submit(fetch_feed, self.archive, name, digest, self.client)
-                        self.dispatch_times[name] = {"started_at": now.isoformat(), "monotonic": mono}
-                        self.last_dispatch[name] = mono
-            if self.outbox_job is None:
+                        phase_at = datetime.fromtimestamp(now.timestamp() - (mono - phase_deadline), timezone.utc)
+                        dispatch = {"phase_at": phase_at.isoformat(), "submitted_at": submitted_at.isoformat(),
+                                    "submitted_monotonic": submitted_mono,
+                                    "scheduler_delay_seconds": max(0, submitted_mono - phase_deadline)}
+                        self.inflight[name] = self.feed_pool.submit(fetch_feed, self.archive, name, digest, self.client,
+                                                                  dispatch=dispatch, telemetry=self.telemetry)
+                        self.dispatch_times[name] = {"started_at": submitted_at.isoformat(), "monotonic": submitted_mono}
+                        self.last_dispatch[name] = submitted_mono
+            if self.outbox_job is None and mono >= self.outbox_retry_at:
                 self.outbox_job = self.outbox_pool.submit(self.flush, self.archive)
         if self.pending_audits and not self.inflight and self.audit_job is None:
             completed_day = self.pending_audits.pop(0)
@@ -258,6 +343,12 @@ class CollectorLoop:
                       "window_active": active, "preparation_active": preparing, "force": self.force,
                       "collector_policy": POLICY, "poll_intervals_seconds": POLL_SECONDS,
                       "minimum_dispatch_spacing_seconds": MIN_DISPATCH_SECONDS,
+                      "telemetry": self.telemetry.health(),
+                      "awake": self.awake.health() if self.awake and hasattr(self.awake, "health") else None,
+                      "workers": {"feed_pending": len(self.inflight), "schedule_pending": self.schedule_job is not None,
+                                  "outbox_pending": self.outbox_job is not None, "audit_pending": self.audit_job is not None},
+                      "outbox": {**self.outbox_health, "consecutive_failures": self.outbox_failures,
+                                 "retry_in_seconds": max(0, self.outbox_retry_at - mono)},
                       "schedule_refresh_pending": self.schedule_job is not None,
                       "available_gtfs_sha256": available_schedule["sha256"] if available_schedule else None,
                       "schedule_refresh_error": self.schedule_error,
@@ -265,7 +356,7 @@ class CollectorLoop:
                       "inflight_requests": {name: {"dispatched_at": value["started_at"],
                           "elapsed_seconds": max(0, mono - value["monotonic"])}
                           for name, value in self.dispatch_times.items()}, "feeds": health}
-            atomic_write(self.archive.root / "runtime" / "collector-status.json", json.dumps(status))
+            self.telemetry.status(status)
             self.last_status = mono
         boundary_wait = (next_boundary(now) - now).total_seconds()
         return min(.5 if active or self.force or self.inflight else 30, max(0, boundary_wait))
@@ -283,10 +374,14 @@ class CollectorLoop:
             except Exception:
                 pass  # _drain records the refresh failure with its real end time.
         self._drain(self.clock(), self.monotonic())
+        if self.owns_telemetry:
+            self.telemetry.close()
 
 
 def collect(archive: Archive, *, force=False, once=False):
     with recorder_lock(archive.root):
+        recovery = archive.recover_pending()
+        print({"pending_capture_recovery": recovery}, flush=True)
         awake = WindowAwake()
         stop_event = threading.Event()
         previous_term = None
@@ -303,7 +398,7 @@ def collect(archive: Archive, *, force=False, once=False):
 
 def _collect(archive: Archive, *, force=False, once=False, awake=None, stop_event=None):
     stop_event = stop_event or threading.Event()
-    with httpx.Client(timeout=20, follow_redirects=True) as client, \
+    with feed_client() as client, \
             ThreadPoolExecutor(max_workers=3) as feed_pool, \
             ThreadPoolExecutor(max_workers=1) as schedule_pool, \
             ThreadPoolExecutor(max_workers=1) as outbox_pool, \

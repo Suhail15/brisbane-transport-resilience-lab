@@ -117,15 +117,16 @@ def test_fixed_phase_corrects_repeated_half_second_lateness(tmp_path):
 
     loop.tick(now=start, monotonic_now=100.0)
     resolve_feed_jobs(feed_pool, at=start + timedelta(milliseconds=200))
-    for slot in range(1, 6):
-        tick_mono = 100.0 + slot * 25 + 0.5
-        loop.tick(now=start + timedelta(seconds=slot * 25 + 0.5), monotonic_now=tick_mono)
-        assert loop.due["TripUpdates"] == 100.0 + (slot + 1) * 25
+    jitter = (0.5, 3.5, 0.5, 3.5, 0.5)
+    for slot, lateness in enumerate(jitter, start=1):
+        tick_mono = 100.0 + slot * 15 + lateness
+        loop.tick(now=start + timedelta(seconds=slot * 15 + lateness), monotonic_now=tick_mono)
+        assert loop.due["TripUpdates"] == 100.0 + (slot + 1) * 15
         assert len(feed_pool.named("TripUpdates")) == slot + 1
-        resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=slot * 25 + 0.7))
+        resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=slot * 15 + lateness + 0.2))
 
-    assert next_phase_deadline(100.0, 25, 100.5) == 125.0
-    assert next_phase_deadline(125.0, 25, 221.5) == 225.0
+    assert next_phase_deadline(100.0, 15, 100.5) == 115.0
+    assert next_phase_deadline(115.0, 15, 221.5) == 235.0
     resolve_non_feed(schedule_pool)
     resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=126))
     loop.close()
@@ -142,7 +143,7 @@ def test_missed_slots_do_not_burst_and_slow_feed_does_not_block_others(tmp_path)
         job = feed_pool.named(name)[0]
         job.future.set_result(valid_result(name, start + timedelta(seconds=1)))
 
-    loop.tick(now=start + timedelta(seconds=25), monotonic_now=25.0)
+    loop.tick(now=start + timedelta(seconds=15), monotonic_now=15.0)
     assert len(feed_pool.named("TripUpdates")) == 1
     assert len(feed_pool.named("VehiclePositions")) == 2
     feed_pool.named("VehiclePositions")[1].future.set_result(
@@ -164,32 +165,54 @@ def test_missed_slots_do_not_burst_and_slow_feed_does_not_block_others(tmp_path)
     feed_pool.named("TripUpdates")[0].future.set_result(
         valid_result("TripUpdates", start + timedelta(seconds=122))
     )
-    loop.tick(now=start + timedelta(seconds=125), monotonic_now=125.0)
+    feed_pool.named("VehiclePositions")[2].future.set_result(
+        valid_result("VehiclePositions", start + timedelta(seconds=122))
+    )
+    loop.tick(now=start + timedelta(seconds=135), monotonic_now=135.0)
     assert len(feed_pool.named("TripUpdates")) == 2
-    resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=126))
+    assert len(feed_pool.named("VehiclePositions")) == 4
+    assert len(feed_pool.named("Alerts")) == 2
+    resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=136))
     resolve_non_feed(schedule_pool)
     loop.close()
 
 
-def test_rapid_success_after_mid_window_restart_waits_until_next_phase(tmp_path):
+@pytest.mark.parametrize(
+    "feed,phase_seconds,next_phase_seconds",
+    [
+        ("TripUpdates", 15, 30),
+        ("VehiclePositions", 15, 30),
+        ("Alerts", 45, 90),
+    ],
+)
+def test_rapid_success_after_mid_window_restart_waits_for_spacing_for_every_feed(
+    tmp_path, feed, phase_seconds, next_phase_seconds
+):
     archive = Archive(tmp_path / "fixture")
-    start = local_at(SERVICE_DATE, 6, 0, 24) + timedelta(milliseconds=900)
+    start = local_at(SERVICE_DATE, 6) + timedelta(seconds=phase_seconds - 0.1)
     loop, feed_pool, schedule_pool, _, _ = make_loop(archive, clock_at=start)
 
     loop.tick(now=start, monotonic_now=100.0)
-    assert len(feed_pool.named("TripUpdates")) == 1
-    feed_pool.named("TripUpdates")[0].future.set_result(
-        valid_result("TripUpdates", start + timedelta(milliseconds=50))
+    assert len(feed_pool.named(feed)) == 1
+    feed_pool.named(feed)[0].future.set_result(
+        valid_result(feed, start + timedelta(milliseconds=50))
     )
 
-    loop.tick(now=local_at(SERVICE_DATE, 6, 0, 25), monotonic_now=100.1)
-    assert len(feed_pool.named("TripUpdates")) == 1
+    loop.tick(
+        now=local_at(SERVICE_DATE, 6) + timedelta(seconds=phase_seconds),
+        monotonic_now=100.1,
+    )
+    assert len(feed_pool.named(feed)) == 1
 
-    loop.tick(now=local_at(SERVICE_DATE, 6, 0, 50), monotonic_now=125.1)
-    assert len(feed_pool.named("TripUpdates")) == 2
-    assert loop.last_dispatch["TripUpdates"] == pytest.approx(125.1)
+    next_mono = 100.0 + (next_phase_seconds - (phase_seconds - 0.1))
+    loop.tick(
+        now=local_at(SERVICE_DATE, 6) + timedelta(seconds=next_phase_seconds),
+        monotonic_now=next_mono,
+    )
+    assert len(feed_pool.named(feed)) == 2
+    assert loop.last_dispatch[feed] == pytest.approx(next_mono)
 
-    resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=26))
+    resolve_feed_jobs(feed_pool, at=start + timedelta(seconds=next_phase_seconds + 1))
     resolve_non_feed(schedule_pool, {"sha256": "prepared"})
     loop.close()
 
@@ -244,6 +267,56 @@ def test_preparation_window_edges_noon_drain_and_weekday_boundaries(tmp_path):
     assert next_boundary(sunday) == local_at(date(2026, 10, 12), 5, 50)
 
 
+@pytest.mark.parametrize("force,expected_jobs", [(False, 0), (True, 3)])
+def test_submit_boundary_rechecks_noon_but_preserves_forced_development_capture(
+    tmp_path, force, expected_jobs
+):
+    archive = Archive(tmp_path / f"fixture-{force}")
+    before_noon = local_at(SERVICE_DATE, 11, 59, 59)
+    after_noon = local_at(SERVICE_DATE, 12, 0, 1)
+
+    class BoundaryClock:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self):
+            call = self.calls
+            self.calls += 1
+            if call < 7:  # Constructor snapshots, then tick's observed 11:59:59 time.
+                return before_noon
+            return after_noon + timedelta(seconds=call - 7)
+
+    feed_pool, schedule_pool, outbox_pool = ControlledPool(), ControlledPool(), ControlledPool()
+    loop = collector.CollectorLoop(
+        archive,
+        feed_pool,
+        schedule_pool,
+        outbox_pool,
+        client=object(),
+        force=force,
+        clock=BoundaryClock(),
+        monotonic=lambda: 100.0,
+        flush=lambda _archive: None,
+    )
+    loop.tick()
+
+    assert len(feed_pool.jobs) == expected_jobs
+    if force:
+        assert all(job.kwargs["dispatch"]["submitted_at"] >= after_noon.isoformat()
+                   for job in feed_pool.jobs)
+
+    for job in feed_pool.jobs:
+        job.future.set_result({
+            "feed": job.args[1],
+            "status": "valid",
+            "received_at": after_noon.astimezone(timezone.utc).isoformat(),
+        })
+    for pool in (schedule_pool, outbox_pool):
+        for job in pool.jobs:
+            job.future.set_result({"sha256": "prepared"})
+    loop.close()
+
+
 def test_restarted_loop_anchors_phases_and_journals_only_elapsed_missing_time(tmp_path):
     archive = Archive(tmp_path / "fixture")
     yesterday = local_at(SERVICE_DATE, 11, 59, 50)
@@ -256,9 +329,9 @@ def test_restarted_loop_anchors_phases_and_journals_only_elapsed_missing_time(tm
 
     assert loop.active_day == next_day.isoformat()
     assert loop.due == {
-        "TripUpdates": 50_025.0,
-        "VehiclePositions": 50_025.0,
-        "Alerts": 50_055.0,
+        "TripUpdates": 50_015.0,
+        "VehiclePositions": 50_015.0,
+        "Alerts": 50_045.0,
     }
     assert not any(
         "Recorder startup missing preceding window receipts" in gap["reason"]
@@ -270,6 +343,7 @@ def test_restarted_loop_anchors_phases_and_journals_only_elapsed_missing_time(tm
 
     late_start = start + timedelta(minutes=1)
     late_loop, _, _, _, _ = make_loop(archive, clock_at=late_start)
+    late_loop.close()  # Drain the asynchronous startup-gap event before inspecting the journal.
     startup_gaps = [
         gap
         for gap in archive.known_gaps(late_start + timedelta(minutes=1))
@@ -314,12 +388,14 @@ class FakeClient:
         return response
 
 
-def test_real_fetch_metadata_and_observed_latency_example_stay_within_35_seconds(
+def test_fetch_metadata_preserves_measured_failure_and_v3_counterfactual_margin(
     tmp_path, monkeypatch
 ):
     archive = Archive(tmp_path / "fixture")
     first_start = local_at(SERVICE_DATE, 6)
-    second_start = first_start + timedelta(seconds=25)
+    # Counterfactual collector-v3 phase: the observed 7 October HTTP durations
+    # are replayed at 15 seconds; this does not rewrite the measured old receipts.
+    second_start = first_start + timedelta(seconds=15)
     client = FakeClient([Response(full_feed()), Response(full_feed())])
     monkeypatch.setattr(
         collector,
@@ -331,11 +407,14 @@ def test_real_fetch_metadata_and_observed_latency_example_stay_within_35_seconds
                 first_start + timedelta(seconds=0.274174),
                 second_start,
                 second_start,
-                first_start + timedelta(seconds=32.066556),
+                first_start + timedelta(seconds=22.066556),
             ]
         ),
     )
-    monotonic = Sequence([100.0, 100.0, 100.274174, 100.274174, 200.0, 200.0, 207.066556, 207.066556])
+    monotonic = Sequence([
+        100.0, 100.0, 100.274174, 100.274174, 100.274174,
+        200.0, 200.0, 207.066556, 207.066556, 207.066556,
+    ])
     monkeypatch.setattr(collector, "time", SimpleNamespace(monotonic=monotonic, sleep=lambda _s: None))
 
     first = collector.fetch_feed(archive, "TripUpdates", None, client)
@@ -346,14 +425,30 @@ def test_real_fetch_metadata_and_observed_latency_example_stay_within_35_seconds
     second_details = json.loads(second["details"])
 
     assert client.urls == [FEEDS["TripUpdates"], FEEDS["TripUpdates"]]
-    assert second_details["collector_policy"] == "collector-v2"
-    assert second_details["poll_interval_seconds"] == 25
+    assert second_details["collector_policy"] == "collector-v3"
+    assert second_details["poll_interval_seconds"] == 15
     assert [attempt["attempt"] for attempt in second_details["attempts"]] == [1]
     assert second_details["request_started_at"] == second_start.isoformat()
     assert second_details["attempts"][0]["started_at"] == second_start.isoformat()
     assert first_details["request_elapsed_seconds"] == pytest.approx(0.274174)
     assert second_details["request_elapsed_seconds"] == pytest.approx(7.066556)
-    assert (second_received - first_received).total_seconds() == pytest.approx(31.792382)
+    assert (second_received - first_received).total_seconds() == pytest.approx(21.792382)
+
+    # Keep the measured 7 October failure and both approved counterfactual margins
+    # distinct. The measured old 30.190457s dispatch spacing exceeded the strict
+    # 35s ceiling after the observed latency grew from 0.274174s to 7.066556s.
+    measured_old_gap = 30.190457 + 7.066556 - 0.274174
+    v2_counterfactual_gap = 25 + 7.066556 - 0.274174
+    v3_counterfactual_gap = 15 + 7.066556 - 0.274174
+    assert measured_old_gap == pytest.approx(36.982839)
+    assert measured_old_gap > 35
+    assert v2_counterfactual_gap == pytest.approx(31.792382)
+    assert v3_counterfactual_gap == pytest.approx(21.792382)
+
+    # A 3.5s late worker still has margin with v3; severe 13.5s lateness remains
+    # visible as a strict-ceiling violation instead of being called healthy.
+    assert v3_counterfactual_gap + 3.5 < 35
+    assert v3_counterfactual_gap + 13.5 > 35
 
     trip_updates = coverage_report(archive)["windows"][0]["feeds"]["TripUpdates"]
     assert trip_updates["max_allowed_gap_seconds"] == 35

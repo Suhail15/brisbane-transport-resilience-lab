@@ -41,7 +41,7 @@ def bootstrap_launch_agent(command, *, run=None, sleep=None):
 
 if sys.platform=='darwin':
     path=Path.home()/'Library/LaunchAgents'/f'{LABEL}.plist'
-    definition={'Label':LABEL,'ProgramArguments':[sys.executable,'-m','resilience.cli','collect'],'WorkingDirectory':str(ROOT),'EnvironmentVariables':{'PYTHONPATH':str(ROOT/'services'),'PYTHONUNBUFFERED':'1'},'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':30,'ExitTimeOut':300,'StandardOutPath':str(logs/'scheduled-collector.log'),'StandardErrorPath':str(logs/'scheduled-collector-error.log'),'ProcessType':'Background'}
+    definition={'Label':LABEL,'ProgramArguments':[sys.executable,'-m','resilience.cli','collect'],'WorkingDirectory':str(ROOT),'EnvironmentVariables':{'PYTHONPATH':str(ROOT/'services'),'PYTHONUNBUFFERED':'1'},'RunAtLoad':True,'KeepAlive':True,'ThrottleInterval':30,'ExitTimeOut':300,'StandardOutPath':str(logs/'scheduled-collector.log'),'StandardErrorPath':str(logs/'scheduled-collector-error.log'),'ProcessType':'Standard'}
     staging=logs/'collector-launchagent.plist';staging.write_bytes(plistlib.dumps(definition))
     if args.remove:
         subprocess.run(['launchctl','bootout',f'gui/{os.getuid()}/{LABEL}'],check=False)
@@ -51,7 +51,7 @@ if sys.platform=='darwin':
         subprocess.run(['launchctl','bootout',f'gui/{os.getuid()}/{LABEL}'],check=False)
         path.write_bytes(staging.read_bytes())
         bootstrap_launch_agent(['launchctl','bootstrap',f'gui/{os.getuid()}',str(path)])
-    print({'prepared':str(staging),'installed_path':str(path),'install_requested':args.install,'scheduled':'Weekday05:50 preparation/awake assertion and separate GTFS refresh; feeds06–12 at25/25/55 seconds; no privileged wake installation'})
+    print({'prepared':str(staging),'installed_path':str(path),'install_requested':args.install,'scheduled':'Weekday05:50 preparation/awake assertion and separate GTFS refresh; feeds06–12 at15/15/45 seconds; no privileged wake installation'})
 elif os.name=='nt':
     # User logon starts a single portable recorder; OS task restarts failed process.
     ns='http://schemas.microsoft.com/windows/2004/02/mit/task';ET.register_namespace('',ns)
@@ -62,5 +62,5 @@ elif os.name=='nt':
     path=logs/'collector-task.xml';ET.ElementTree(task).write(path,encoding='utf-16',xml_declaration=True)
     if args.remove:subprocess.run(['schtasks','/Delete','/TN',LABEL,'/F'],check=True)
     elif args.install:subprocess.run(['schtasks','/Create','/TN',LABEL,'/XML',str(path),'/F'],check=True);subprocess.run(['schtasks','/Run','/TN',LABEL],check=True)
-    print({'prepared':str(path),'install_requested':args.install,'scheduled':'Logged-in user process prepares/holds sleep assertion weekdays05:50–12; feeds06–12 at25/25/55 seconds; already dispatched requests drain after12'})
+    print({'prepared':str(path),'install_requested':args.install,'scheduled':'Logged-in user process prepares/holds sleep assertion weekdays05:50–12; feeds06–12 at15/15/45 seconds; already dispatched requests drain after12'})
 else:raise SystemExit('Automatic service installer supports macOS/Windows; use a user process manager on Linux')
