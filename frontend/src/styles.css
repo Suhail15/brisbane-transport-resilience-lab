@@ -413,3 +413,10 @@ a:hover { color: #0b4e50; }
   .evidence-grid { grid-template-columns: 1fr 1fr; }
   .policy-table th, .policy-table td { padding: 7px 3px; font-size: 7px; }
 }
+
+/* Recorded-comparison controls share the form's spacing and readable widths. */
+.recovery-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 16px 0 12px; }
+.recovery-filter-grid label { min-width: 0; display: flex; flex-direction: column; gap: 7px; color: #627a7c; font-size: 11px; font-weight: 650; }
+.recovery-filter-grid select { width: 100%; min-width: 0; height: 40px; border: 1px solid #dfe7e2; border-radius: 8px; background: #fffefa; padding: 0 10px; color: #375b5d; font: inherit; }
+.recovery-filter-grid select:focus-visible { outline: 2px solid #17827a; outline-offset: 2px; }
+@media (max-width: 760px) { .recovery-filter-grid { grid-template-columns: 1fr; } }
