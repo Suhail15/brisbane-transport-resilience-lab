@@ -3,7 +3,7 @@
 The first release evaluates three recorded mornings, 19–21 October 2026. Source receipts meet the unchanged six-hour gap rules on six weekdays; the final protocol uses three later mornings after two development dates.
 
 - Local Python: **204 passed, one optional infrastructure check skipped**, 22 October. The opt-in API/PostGIS test run also passed **2/2**, including spatial stops and walking geometry in the actual local database. One upstream Starlette/httpx deprecation warning remains.
-- Frontend: **23 passed**, including full synthetic compact-bundle production builds, filters and preserved immutable manifests.
+- Frontend: **28 passed**, including full synthetic compact-bundle production builds, filters and preserved immutable manifests.
 - Independent morning checker: **54/54** saved cases reconcile, including denominators, objectives, bus duties, cutoffs and stress inputs.
 - Offline reproduction: **54/54** exact matches from the saved inputs, 508.35 seconds on the recorded Mac environment.
 - Journey HTTP performance: **300 measurements** across three snapshots, worst date p95 **0.17285 seconds**. First lookup included; two date-specific clients overlapped. This measures journey queries, not recovery search.

@@ -256,3 +256,26 @@ export function filterRecoveryRuns(entries, filters = DEFAULT_RECOVERY_FILTERS) 
       && (!filters.sensitivity || filters.sensitivity === values.sensitivity);
   });
 }
+
+export function collectionGapsBeforeSnapshot(gaps = [], snapshot) {
+  const awareTime = (value) => typeof value === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+    ? Date.parse(value) : NaN;
+  const cutoff = awareTime(snapshot?.snapshot_at);
+  const morning = /^\d{4}-\d{2}-\d{2}$/.test(snapshot?.service_date ?? '')
+    ? Date.parse(`${snapshot.service_date}T06:00:00+10:00`) : NaN;
+  return gaps.flatMap((gap) => {
+    const source = gap && typeof gap === 'object' ? gap : {};
+    const start = awareTime(source.started_at);
+    const end = awareTime(source.ended_at);
+    const detected = awareTime(source.detected_at);
+    if (Number.isFinite(cutoff) && Number.isFinite(detected) && detected > cutoff) return [];
+    const open = source.ended_at === null;
+    const malformed = !Number.isFinite(cutoff) || !Number.isFinite(morning) || cutoff < morning
+      || !Number.isFinite(start) || (!open && (!Number.isFinite(end) || end < start))
+      || (source.detected_at != null && !Number.isFinite(detected));
+    // Unclassifiable records remain visible; their timing cannot establish coverage.
+    if (malformed) return [{ gap: source, status: 'unknown' }];
+    if ((!open && end <= morning) || start > cutoff) return [];
+    return [{ gap: source, status: 'overlap' }];
+  });
+}

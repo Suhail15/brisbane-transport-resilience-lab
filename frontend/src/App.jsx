@@ -3,6 +3,7 @@ import ReplayMap from './ReplayMap.jsx';
 import { AdapterError, createAdapter } from './api.js';
 import {
   countVehicleQuality,
+  collectionGapsBeforeSnapshot,
   DEFAULT_RECOVERY_FILTERS,
   filterRecoveryRuns,
   recoveryFilterOptions,
@@ -310,7 +311,7 @@ function ReplayView({
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const quality = display?.quality ?? snapshot?.quality ?? {};
   const vehicles = display?.vehicles ?? [];
-  const frameGaps = display?.gaps ?? [];
+  const frameGaps = collectionGapsBeforeSnapshot(display?.gaps ?? [], snapshot);
 
   useEffect(() => { setSelectedStop(null); setSelectedVehicle(null); }, [snapshot?.snapshot_id]);
 
@@ -368,10 +369,10 @@ function ReplayView({
         <div className="recording-footnote">
           <div><strong>Snapshot time</strong><span>{snapshot ? formatBrisbaneTimestamp(snapshot.snapshot_at) : '—'} · Brisbane</span></div>
           <div><strong>Source cutoff</strong><span>Only records received by this snapshot are shown.</span></div>
-          <div><strong>Frame gaps</strong><span>{!display && loading ? 'Loading frame details…' : !display ? 'Not available' : frameGaps.length ? `${frameGaps.length} source gap${frameGaps.length === 1 ? '' : 's'} reported` : 'No feed gap is listed inside this frame.'}</span></div>
+          <div><strong>Collection gaps before this snapshot</strong><span>{!display && loading ? 'Loading frame details…' : !display ? 'Not available' : frameGaps.length ? `${frameGaps.length} overlapping or unknown interval${frameGaps.length === 1 ? '' : 's'}` : 'No collection gap is listed from 06:00 to this cutoff.'} Since 06:00 Brisbane; this does not prove full-window completeness.</span></div>
           <div><strong>Route patterns</strong><span>Lines show patterns in the matching timetable, not proof of service at this instant. Active trips determine service choices.</span></div>
         </div>
-        {!!frameGaps.length && <div className="gap-list">{frameGaps.map((gap, index) => <div key={`${gap.start ?? index}`}><span className="gap-marker" />{gap.label || `${gap.start ?? 'Unknown start'} – ${gap.end ?? 'Unknown end'}`}</div>)}</div>}
+        {!!frameGaps.length && <div className="gap-list">{frameGaps.slice(0, 10).map(({ gap, status }, index) => <div key={`${gap.feed ?? 'unknown'}:${gap.started_at ?? index}`}><span className="gap-marker" /><span>{status === 'unknown' ? 'Unknown interval · ' : ''}{gap.feed || 'Unknown feed'} · {gap.started_at ? formatBrisbaneTimestamp(gap.started_at, { timeStyle: 'medium' }) : 'Unknown start'} – {gap.ended_at === null ? 'Open at source' : gap.ended_at ? formatBrisbaneTimestamp(gap.ended_at, { timeStyle: 'medium' }) : 'Unknown end'} · {gap.reason || 'Reason not recorded'} · detected {gap.detected_at ? formatBrisbaneTimestamp(gap.detected_at, { timeStyle: 'medium' }) : 'at unknown time'} Brisbane</span></div>)}{frameGaps.length > 10 && <p>Showing 10 of {frameGaps.length} overlapping or unknown collection intervals.</p>}</div>}
       </section>
     </>
   );
@@ -727,6 +728,7 @@ function EvidenceView({ catalog, snapshot, snapshots, display, choices, runs, lo
   const gates = catalog?.release_gate?.gates ?? {};
   const failedGateCount = Object.values(gates).filter((value) => value === false).length;
   const sourceSummary = catalog?.source_summary;
+  const collectionGaps = collectionGapsBeforeSnapshot(display?.gaps ?? [], snapshot);
   const fairfieldPlatforms = ['600052', '600194'].map((id) => (choices?.stops ?? []).find((stop) => String(stop.stop_id) === id)).filter(Boolean);
   const ordered = [...snapshots].sort((a, b) => Date.parse(a.snapshot_at) - Date.parse(b.snapshot_at));
 
@@ -743,7 +745,7 @@ function EvidenceView({ catalog, snapshot, snapshots, display, choices, runs, lo
           <EvidenceValue label="Realtime feed" value={<StatusPill value={quality.realtime_status} />} />
           <EvidenceValue label="Walking paths" value={<StatusPill value={quality.walking_status} />} />
           <EvidenceValue label="Recorded positions" value={display ? `${formatCount(display.vehicles?.length ?? 0)} · ${vehicleCounts.fresh} fresh, ${vehicleCounts.stale} stale, ${vehicleCounts.unmatched} unmatched, ${vehicleCounts.unknown} unknown` : loading ? 'Loading selected frame…' : 'Not available'} />
-          <EvidenceValue label="Reported frame gaps" value={display ? formatCount(display.gaps?.length ?? 0) : loading ? 'Loading…' : 'Not available'} />
+          <EvidenceValue label="Collection gaps before this snapshot" value={display ? `${formatCount(collectionGaps.length)} overlapping or unknown since 06:00` : loading ? 'Loading…' : 'Not available'} />
           <EvidenceValue label="Source alerts" value={display ? formatCount(display.alerts?.length ?? 0) : loading ? 'Loading…' : 'Not available'} />
           <EvidenceValue label="Recorded comparisons" value={formatCount(runs.length)} />
         </div>
