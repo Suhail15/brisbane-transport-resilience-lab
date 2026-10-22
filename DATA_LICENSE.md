@@ -19,8 +19,12 @@ hypothetical disruptions and extra-bus services. None of these is an official
 transport forecast or evidence of achieved passenger outcomes.
 
 Translink's additional publication conditions and contact/approval status are
-recorded in [the source register](docs/SOURCES.md). Public release remains gated
-until that review is resolved.
+recorded in [the source register](docs/SOURCES.md). The user supplied the written
+Translink reply on 22 October 2026 covering this portfolio use, with attribution,
+independent branding and explicit simulation labels. Sender headers were not
+independently inspected. Exact package verification remains a release requirement.
+
+Contains public transport data provided by Translink (Department of Transport and Main Roads, Queensland) under CC BY 4.0. Translink does not endorse and is not affiliated with this independent project or its simulation outcomes.
 
 ## Walking network and basemap
 

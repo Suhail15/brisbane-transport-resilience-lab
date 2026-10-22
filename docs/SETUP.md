@@ -37,15 +37,12 @@ The official PostGIS image requires linux/amd64 emulation on the tested Apple Si
 Mac; Redpanda remains native. Named volumes are project scoped. Use `docker compose
 stop` to stop this project's services. Do not prune unrelated Docker objects.
 Mac startup, live health, PostGIS storage and Redpanda deliveries were exercised.
-The private repository Verification run 36965117356 passed the macOS/Linux/Windows
-backend matrix at fec68f7. INT-003 adds mandatory frontend install/test/build; its
-new candidate revision still needs a fresh CI run. No Homebrew installation is required.
+The Verification workflow checks Python on macOS, Linux and Windows and installs, tests and builds the frontend. Candidate-specific outcomes are retained with each release. No Homebrew installation is required.
 
 OTP is separate independent validation: official OTP 2.10.0 requires Java 25. Set up
 Java and the official shaded JAR, then `python scripts/prepare_otp.py` and `python
 scripts/convert_osm.py`. Run `java -Xmx2G -jar <OTP.jar> --build --save data/derived/otp`, then
-`java -Xmx2G -jar <OTP.jar> --load --serve --port 8801 data/derived/otp`. See `REFERENCE_VALIDATION.md` and ARCH-001 for six exact transit matches and six
-explained access differences at the reviewed scope. Graph startup alone is not routing verification.
+`java -Xmx2G -jar <OTP.jar> --load --serve --port 8801 data/derived/otp`. See `REFERENCE_VALIDATION.md` for the exact morning comparison scope and retained access differences. Graph startup alone is not routing verification.
 
 Persistent collector: using the environment Python, `python scripts/install_collector.py`
 prepares a user service locally; add `--install` to install/start it, or `--remove` to

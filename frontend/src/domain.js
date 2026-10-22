@@ -216,3 +216,43 @@ export function formatPercent(value) {
 export function humanLabel(value) {
   return String(value ?? 'unknown').replaceAll('_', ' ');
 }
+
+// The declared first final date and protocol sensitivity case determine the initial view.
+export const DEFAULT_RECOVERY_FILTERS = Object.freeze({ date: '2026-10-19', scenario: 'stop_unavailable', sensitivity: '0' });
+
+export function recoveryRecordingDate(sourceTime) {
+  const timestamp = new Date(sourceTime);
+  if (!sourceTime || Number.isNaN(timestamp.getTime())) return 'unknown';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Brisbane', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(timestamp);
+}
+
+function recoveryFilterValues(summary) {
+  return {
+    date: summary.serviceDate || recoveryRecordingDate(summary.sourceTime),
+    scenarios: summary.scenarioKinds?.length ? summary.scenarioKinds : ['unknown'],
+    sensitivity: Number.isFinite(summary.sensitivity) ? String(summary.sensitivity) : 'unknown',
+  };
+}
+
+export function recoveryFilterOptions(entries) {
+  const dates = new Set(); const scenarios = new Set(); const sensitivities = new Set();
+  for (const { summary } of entries) {
+    const values = recoveryFilterValues(summary);
+    dates.add(values.date); values.scenarios.forEach((kind) => scenarios.add(kind)); sensitivities.add(values.sensitivity);
+  }
+  return {
+    dates: [...dates].sort(), scenarios: [...scenarios].sort(),
+    sensitivities: [...sensitivities].sort((a, b) => a === 'unknown' ? 1 : b === 'unknown' ? -1 : Number(a) - Number(b)),
+  };
+}
+
+export function filterRecoveryRuns(entries, filters = DEFAULT_RECOVERY_FILTERS) {
+  return entries.filter(({ summary }) => {
+    const values = recoveryFilterValues(summary);
+    return (!filters.date || filters.date === values.date)
+      && (!filters.scenario || values.scenarios.includes(filters.scenario))
+      && (!filters.sensitivity || filters.sensitivity === values.sensitivity);
+  });
+}

@@ -15,6 +15,16 @@ from .files import atomic_write
 
 BRISBANE=ZoneInfo("Australia/Brisbane")
 
+def is_weekday_morning_capture(captured_at):
+    if captured_at.utcoffset() is None:raise ValueError("capture time requires timezone")
+    local=captured_at.astimezone(BRISBANE)
+    return local.weekday()<5 and 6<=local.hour<12
+
+def capture_quality_warning(captured_at):
+    if is_weekday_morning_capture(captured_at):
+        return "Recorded morning inputs; complete-window receipt coverage is audited separately"
+    return "Recorded inputs outside the weekday morning evaluation window"
+
 def source_record(receipt):
     return SourceRecord(record_id=receipt["record_id"],source_kind="gtfs" if receipt["feed"]=="GTFS" else "osm" if receipt["feed"]=="OSM" else "gtfs_rt",received_at=datetime.fromisoformat(receipt["received_at"]),event_at=datetime.fromisoformat(receipt["event_at"]) if receipt["event_at"] else None,sha256=receipt["sha256"],source_ref=receipt["source_url"])
 
@@ -126,7 +136,7 @@ def build_snapshot(archive,as_of,*,store=True,include_realtime=True):
     elif age>120 or not updates:status="stale"
     elif diagnostics["stale"] or diagnostics["quarantined"] or trip_errors:status="degraded"
     else:status="fresh"
-    warnings.extend(["Predicted feed times are not measured arrivals", "Scheduled fallback applies to unmatched, missing or stale trip entities", "Walking coverage incomplete; unavailable platform paths cannot be inferred", "Development afternoon capture; no complete morning is claimed"])
+    warnings.extend(["Predicted feed times are not measured arrivals", "Scheduled fallback applies to unmatched, missing or stale trip entities", "Walking coverage incomplete; unavailable platform paths cannot be inferred", capture_quality_warning(as_of)])
     quality=QualityMetadata(realtime_status=status,schedule_status="verified" if schedule_age<86400 else "unverified",walking_status="incomplete" if osm else "missing",realtime_age_seconds=age,source_event_age_seconds=int((as_of-datetime.fromisoformat(tu["event_at"])).total_seconds()) if tu and tu["event_at"] else None,warnings=tuple(warnings))
     method_digest=hashlib.sha256(b"pipeline-v2"+b"".join(Path(p).read_bytes() for p in (Path(__file__),Path(__file__).with_name("walking.py"),Path(__file__).with_name("schedule.py"),Path(__file__).parents[1]/"contracts.py",Path("configs/pilot.json")))).hexdigest()
     sid=hashlib.sha256((as_of.isoformat()+"|"+"|".join(sorted(r["record_id"] for r in receipts))+"|pilot-v1|"+str(include_realtime)+"|"+method_digest).encode()).hexdigest()[:24]

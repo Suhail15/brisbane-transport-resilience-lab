@@ -8,7 +8,7 @@
     "dev:static": "node scripts/dev-static.mjs",
     "build": "vite build",
     "build:static": "node scripts/build-static.mjs",
-    "test": "node --test ../tests/frontend/adapters.test.js"
+    "test": "node --test ../tests/frontend/*.test.js"
   },
   "dependencies": {
     "maplibre-gl": "6.11.2",

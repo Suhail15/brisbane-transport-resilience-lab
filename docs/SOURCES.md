@@ -1,6 +1,6 @@
 # Source register and publication review
 
-Reviewed 2026-10-02; public-use terms rechecked 2026-10-03. Source receipts preserve exact retrieval times and SHA256 locally.
+Reviewed 2026-10-02; public-use terms rechecked 2026-10-22. Source receipts preserve exact retrieval times and SHA256 locally.
 
 | Source | Publisher | Source and terms | Licence / coverage |
 |---|---|---|---|
@@ -21,10 +21,24 @@ require contact details be supplied/current. Their public-material provision add
 network/logo/images and requests intended use be submitted to marketing@translink.com.au;
 it allows three full business days for processing. On 2026-10-02, the user authorized
 a request in their own name. It was sent to marketing@translink.com.au and verified
-in the user's Sent mailbox, with current contact details supplied. Approval has not
-yet been received. This remains an explicit release blocker for public network
-material. Branding must remain independent; attribution is not endorsement. Source
-availability and a CC licence alone do not mark the project licence gate complete.
+in the user's Sent mailbox, with current contact details supplied. On 2026-10-22 the
+user supplied the written Translink reply in this project chat. It covers source code
+and compact static/realtime GTFS recordings for noncommercial research, academic and
+portfolio use, subject to attribution, independent branding and explicit simulation
+labels. This is user-provided correspondence; original sender headers and the email
+timestamp were not independently inspected. The private supplied text and its hash
+remain outside public Git history. It does not imply Translink endorsement or cover
+another publisher's data. The release licence review must still verify the actual
+packaged contents and OSM obligations.
+
+Required notice, retained in the README and app:
+
+> Contains public transport data provided by Translink (Department of Transport and Main Roads, Queensland) under CC BY 4.0. Translink does not endorse and is not affiliated with this independent project or its simulation outcomes.
+
+The compact data is a selected, normalized and sampled derivative of the archived
+GTFS feeds. Disruption overlays, additional buses and running-time stresses are this
+project's hypothetical changes. Source vehicle positions and provider predictions
+retain their own timestamps; neither proves an observed passenger arrival.
 
 Public release must document Translink contact/approval handling, OSM derivative data
 licensing, and the exact compact bundle contents. Raw archives are local and ignored.
@@ -36,3 +50,9 @@ On 2026-10-03, the published open-data and separate terms pages were rechecked.
 Online licence information does not constitute an individual approval reply. The
 request remains pending; no approval record or release gate was changed. Exact
 retrieved terms and review hashes are retained privately under `data/runtime/`.
+
+On 2026-10-22, the official Translink terms, CC BY 4.0 deed and OSM copyright page
+were rechecked alongside the user-provided reply. Publisher handling is now supported
+by that correspondence rather than inferred from a public licence page. OSM-derived
+walking exports are separately offered under ODbL 1.0 with their source/derivation
+records. All remaining evidence gates continue to apply before publication.

@@ -208,3 +208,34 @@ Owner: ARCH-001, GPT-6.1 Sol, reasoning max.
     backslashes. Root approves POSIX serialization of the reported relative
     pending path, retaining every corruption/recovery assertion and validation.
     The OS-specific filesystem path remains a Path; only its report form changes.
+27. **Final morning protocol, coordinator approved 2026-10-22 (ARCH-007).**
+    Six complete mornings now satisfy the five-window receipt-coverage requirement.
+    Freeze `configs/morning-evaluation.v1.json` before computing morning policy
+    outcomes: 9/13 October development, 19/20/21 October evaluation and 22 October
+    reserve. Use cutoff 07:30:05 Brisbane and the existing fixed 20 OD pairs expanded
+    into 100 requests. Preserve all four existing source-selected scenario rules,
+    budgets 0/2/4/8, 128 swap evaluations, and stop-closure budget-two 0/300/600-second
+    running-time sensitivity. A missing target is an explicit unsupported case,
+    never a different target chosen after observing outcomes. Record all nulls.
+    Replay frames sample every 15 minutes at five seconds after the quarter hour;
+    label this sampling and do not interpolate source positions. Full immutable
+    routing snapshots remain local. Labels must identify recorded morning inputs
+    without claiming measured arrivals or equating receipt coverage with live entity
+    freshness. Cache identical versioned geometry within a single bundle export.
+    Private morning projections may be prepared before publisher approval; public
+    preparation and publication still enforce every existing source/release gate.
+28. **Exact public-site deployment boundary, coordinator approved 2026-10-22.**
+    Final source/analysis verification runs locally against the private raw archive.
+    GitHub Pages receives only the reviewed compact data and static site. An outer
+    deployment ZIP contains `attestation.json`, `site-manifest.json` and `site/*`.
+    Its SHA256 is pinned at authenticated workflow dispatch. The attestation binds
+    the frozen candidate Git revision, original public data manifest digest, exact
+    full-site manifest digest and all eleven actually passed local release gates.
+    Deployment verification uses only the standard library: validate the supplied
+    archive digest/revision, reject unsafe/duplicate/symlink/oversized ZIP entries,
+    require the exact regular-file set and every data/site hash, then extract to a
+    new directory. It does not claim to rerun private analytical checks on GitHub.
+    Both ZIP and data projection are immutable after review. A candidate-preparation
+    flag records generation history; only the separate all-gates attestation permits
+    deployment. No credentials or private correspondence belong in the public ZIP.
+    Root controls the workflow, final release evidence, public visibility and upload.

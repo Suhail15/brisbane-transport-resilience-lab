@@ -1,49 +1,27 @@
-# Private offline reproduction
+# Reproduce the recorded experiments
 
-Use the matching repository revision and locked Python environment. No upstream
-reload is used: saved requests, scenarios, candidate IDs, budgets and bounds are
-recomputed from the recorded normalized snapshot or its hashed stress derivative.
+The first release contains 54 completed cases from 19–21 October 2026. They use the same fixed journey set, 07:30:05 Brisbane decision cutoff and frozen scenario selection rules. See [the protocol](MORNING_EVALUATION.md) and [findings](FINDINGS.md) before interpreting the numbers.
 
-The private INT-003 pack is under `data/derived/reproduction-int003-reviewed`. It includes
-eight immutable completed runs, canonical inputs/metadata, full nominal/stress
-snapshots, original compressed source objects and receipts, frozen engine/adapter
-code, configuration, software/data licences and attribution. OSM-derived walking
-links are separately available under `walking/` with ODbL attribution; they also
-occur in the full engine snapshots. Supplementary monthly proxy evidence is separate
-from the primary inputs. The pack is ignored by Git and has not been published.
+## Download and check
 
-Run from the repository root, substituting the externally reviewed manifest digest:
+Use the repository revision named in the release attestation, the locked Python environment, and the `morning-reproduction.zip` asset from the [release](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/tag/v1.0.0). The release's `SHA256SUMS.txt` records the ZIP and extracted manifest identities. Verify the downloaded bytes, extract into a new directory and run from the repository root:
 
 ```text
-python scripts/reproduce.py data/derived/reproduction-int003-reviewed --expected-manifest-sha256 <reviewed-sha256> --runs <run-id> ...
+python scripts/reproduce.py <extracted-pack-directory> --expected-manifest-sha256 <manifest-sha256-from-release>
 ```
 
-The verifier checks the exact pack file set, all listed bytes and exact engine/adapter identities, then
-compares primary metrics, plan/comparison objectives, selected candidates, duties
-and rejection facts exactly. Timing, progress and store diagnostics are excluded.
-A supplied wrong manifest digest fails. Without an expected digest, the check only
-establishes internal consistency; it does not authenticate an untrusted pack.
+An optional `--runs <run-id> ...` selects a subset. Omitting it recomputes all 54. No upstream requests, running database or collector are needed for this command. Use [SETUP.md](SETUP.md) for the environment; Python dependencies are pinned in `requirements.lock.txt`.
 
-Four final stop-closure budget runs were independently recomputed. The task handoff
-records their exact IDs, externally reviewed manifest hash and local report path.
-The prepared manifest identity is
-`67160494c4307f5cae928e4ed52268beffd990a4779b90035461f78bdf3cdf92`.
-This anchors 65 files (138632495 content bytes); the pack remains private.
-Changing a snapshot, derived input, source receipt/object, immutable input or final
-result is rejected. Historical runs are never relabelled with current code hashes.
-Private previews may show explicitly legacy or unavailable-code runs; public exports
-require complete versioned artifacts and matching code.
-Bundle export and the live run index enumerate immutable final results first and
-reject any conflicting progress file before eligibility filtering. A completed
-final remains available when its mutable progress file is absent; removing metadata
-from a progress file cannot relabel the final as legacy.
+The verifier checks the exact file set, hashes, engine and adapter identities. It recomputes metrics, no-action and simple-policy objectives, selected services, vehicle duties and rejections. Those facts must match exactly. Timing, progress and store diagnostics are excluded. A wrong external manifest digest fails. Without that external digest, a manifest establishes internal consistency only.
 
-To prepare another reviewed private packet:
+## What is included
 
-```text
-python scripts/prepare_release.py --bundle data/derived/private-preview --pack data/derived/private-pack --runs <explicit-reviewed-run-ids>
-```
+The pack contains immutable requests and results, nominal and stress-derived normalized snapshots, selected compressed source objects and receipt records, matching engine code, configuration and licences. It contains only the selected source inputs, not the full collection archive. OSM-derived walking data is available separately under `walking/` with ODbL attribution; full engine snapshots also contain those walking links. Translink data attribution and modifications are described in `code/DATA_LICENSE.md`.
 
-Use a fresh pack directory. Raw source redistribution still requires the reviewed
-source conditions and publisher approval; producing this private pack does not
-satisfy collection, licence or publication gates.
+Before publication, all 54 cases were recomputed offline and matched in 508.35 seconds on the documented Mac environment. This is a reproducibility check, not an independent proof of routing optimality. A separate independent checker recalculates the saved journey metrics; source-specific OpenTripPlanner comparisons are documented in [reference validation](REFERENCE_VALIDATION.md).
+
+## Preparing a new release
+
+Keep archives and generated packs outside Git. `scripts/prepare_mornings.py`, `scripts/run_mornings.py`, `scripts/verify_morning_results.py` and `scripts/summarize_mornings.py` implement the frozen protocol. Public preparation requires the complete recording windows, exactly three eligible morning dates and reviewed source permissions. Candidate preparation is not publication authorization. All release gates must pass before any upload.
+
+The older afternoon development packet remains local and separate from this release. It is not relabelled as morning or final evaluation evidence.

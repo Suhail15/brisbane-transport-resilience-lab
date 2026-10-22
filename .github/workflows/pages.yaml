@@ -1,31 +1,248 @@
-name: Guarded Pages preparation
+name: Pinned GitHub Pages deployment
+
 on:
   workflow_dispatch:
     inputs:
-      bundle_path:
-        description: Reviewed public bundle directory in the checked-out revision
+      release_tag:
+        description: Release tag containing the reviewed deployment archive
         required: true
-        default: release/public
+        type: string
+      archive_sha256:
+        description: Expected SHA-256 of github-pages-site.zip (64 hexadecimal characters)
+        required: true
+        type: string
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
 permissions:
   contents: read
+
 jobs:
-  verify:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out the dispatched candidate revision
+        uses: actions/checkout@v4
         with:
-          python-version: '3.11'
-      - run: pip install -r requirements.lock.txt
-      - run: pip install -e . --no-deps
-      - name: Verify immutable assets and public eligibility
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Resolve the release asset and download it to runner temp
         env:
-          BUNDLE_PATH: ${{ inputs.bundle_path }}
-        run: python scripts/verify_release.py --bundle "$BUNDLE_PATH"
-      - uses: actions/setup-node@v4
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ARCHIVE_SHA256: ${{ inputs.archive_sha256 }}
+          CANDIDATE_REVISION: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GH_TOKEN: ${{ github.token }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import quote, urljoin, urlsplit
+          from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+          class WorkflowError(Exception):
+              pass
+
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          opener = build_opener(NoRedirect)
+          api_url = os.environ["GITHUB_API_URL"].rstrip("/")
+          token = os.environ["GH_TOKEN"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          tag = os.environ["RELEASE_TAG"]
+          expected_sha256 = os.environ["ARCHIVE_SHA256"]
+          candidate_revision = os.environ["CANDIDATE_REVISION"].lower()
+          runner_temp = Path(os.environ["RUNNER_TEMP"])
+
+          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", tag):
+              raise WorkflowError("release_tag contains unsupported characters or length")
+          components = tag.split("/")
+          if (".." in tag or "//" in tag or tag.endswith("/") or tag.endswith(".") or "@{" in tag
+                  or any(part.startswith(".") or part.endswith(".lock") for part in components)):
+              raise WorkflowError("release_tag is not a canonical Git tag name")
+          if not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256):
+              raise WorkflowError("archive_sha256 must be 64 hexadecimal characters")
+          if not re.fullmatch(r"[0-9a-f]{40}", candidate_revision):
+              raise WorkflowError("The dispatched candidate revision is not a 40-character Git SHA")
+          if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+              raise WorkflowError("GITHUB_REPOSITORY is not a valid owner/repository pair")
+          api_parts = urlsplit(api_url)
+          if api_parts.scheme != "https" or not api_parts.hostname or api_parts.username or api_parts.password:
+              raise WorkflowError("GITHUB_API_URL must be an HTTPS API origin")
+          if not token:
+              raise WorkflowError("GitHub API token is unavailable")
+
+          owner, repo = repository.split("/", 1)
+          repo_api = f"{api_url}/repos/{quote(owner, safe='')}/{quote(repo, safe='')}"
+
+          def api_json(url):
+              request = Request(url, headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "brisbane-transport-resilience-lab-pages-deployment",
+              })
+              try:
+                  with opener.open(request, timeout=60) as response:
+                      payload = response.read(10 * 1024 * 1024 + 1)
+                      if len(payload) > 10 * 1024 * 1024:
+                          raise WorkflowError("GitHub API response exceeded the metadata size limit")
+                      return json.loads(payload.decode("utf-8"))
+              except HTTPError as exc:
+                  raise WorkflowError(f"GitHub API request returned HTTP {exc.code}") from None
+              except (URLError, TimeoutError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                  raise WorkflowError(f"GitHub API request failed ({type(exc).__name__})") from None
+
+          encoded_tag = quote(tag, safe="/")
+          release = api_json(f"{repo_api}/releases/tags/{encoded_tag}")
+          if not isinstance(release, dict) or release.get("tag_name") != tag:
+              raise WorkflowError("The selected release does not have the requested tag")
+          release_id = release.get("id")
+          if type(release_id) is not int or release_id < 1:
+              raise WorkflowError("The selected release has an invalid identifier")
+
+          reference = api_json(f"{repo_api}/git/ref/tags/{encoded_tag}")
+          if not isinstance(reference, dict) or reference.get("ref") != f"refs/tags/{tag}":
+              raise WorkflowError("The selected Git tag reference does not match release_tag")
+          target = reference.get("object")
+          visited_tags = set()
+          for _ in range(10):
+              if not isinstance(target, dict) or not re.fullmatch(r"[0-9a-fA-F]{40}", str(target.get("sha", ""))):
+                  raise WorkflowError("The selected Git tag has an invalid object")
+              object_sha = target["sha"].lower()
+              object_type = target.get("type")
+              if object_type == "commit":
+                  resolved_revision = object_sha
+                  break
+              if object_type != "tag" or object_sha in visited_tags:
+                  raise WorkflowError("The selected Git tag does not resolve to a commit")
+              visited_tags.add(object_sha)
+              tag_object = api_json(f"{repo_api}/git/tags/{object_sha}")
+              target = tag_object.get("object") if isinstance(tag_object, dict) else None
+          else:
+              raise WorkflowError("The selected Git tag exceeds the tag-object resolution limit")
+          if resolved_revision != candidate_revision:
+              raise WorkflowError("The release tag does not resolve to the dispatched candidate revision")
+
+          assets = []
+          for page in range(1, 102):
+              page_assets = api_json(f"{repo_api}/releases/{release_id}/assets?per_page=100&page={page}")
+              if not isinstance(page_assets, list) or len(page_assets) > 100:
+                  raise WorkflowError("GitHub returned an invalid release asset page")
+              assets.extend(page_assets)
+              if len(page_assets) < 100:
+                  break
+          else:
+              raise WorkflowError("Release asset pagination exceeded the safety limit")
+          matches = [asset for asset in assets if isinstance(asset, dict) and asset.get("name") == "github-pages-site.zip"]
+          if len(matches) != 1:
+              raise WorkflowError("The release must contain exactly one github-pages-site.zip asset")
+          asset_id = matches[0].get("id")
+          if type(asset_id) is not int or asset_id < 1 or matches[0].get("state") != "uploaded":
+              raise WorkflowError("The github-pages-site.zip release asset is not uploaded")
+
+          archive_path = runner_temp / "github-pages-site.zip"
+          if archive_path.exists():
+              raise WorkflowError("The runner-temp archive path already exists")
+          asset_url = f"{repo_api}/releases/assets/{asset_id}"
+          current_url = asset_url
+          auth = True
+          visited_urls = set()
+          redirect_codes = {301, 302, 303, 307, 308}
+          try:
+              for _ in range(6):
+                  if current_url in visited_urls:
+                      raise WorkflowError("The release asset returned a redirect loop")
+                  visited_urls.add(current_url)
+                  headers = {"Accept": "application/octet-stream",
+                             "User-Agent": "brisbane-transport-resilience-lab-pages-deployment"}
+                  if auth:
+                      headers["Authorization"] = f"Bearer {token}"
+                      headers["X-GitHub-Api-Version"] = "2022-11-28"
+                  request = Request(current_url, headers=headers)
+                  try:
+                      response = opener.open(request, timeout=120)
+                  except HTTPError as exc:
+                      location = exc.headers.get("Location") if exc.code in redirect_codes else None
+                      status = exc.code
+                      exc.close()
+                      if location is None:
+                          raise WorkflowError(f"Release asset request returned HTTP {status}") from None
+                      redirected_url = urljoin(current_url, location)
+                      redirect_parts = urlsplit(redirected_url)
+                      if (redirect_parts.scheme != "https" or not redirect_parts.hostname
+                              or redirect_parts.username or redirect_parts.password):
+                          raise WorkflowError("The release asset returned an unsafe redirect")
+                      current_url = redirected_url
+                      auth = False
+                      continue
+                  if response.status != 200:
+                      response.close()
+                      raise WorkflowError(f"Release asset request returned HTTP {response.status}")
+                  content_length = response.headers.get("Content-Length")
+                  if content_length and content_length.isdecimal() and int(content_length) > 500 * 1024 * 1024:
+                      response.close()
+                      raise WorkflowError("The release archive exceeds the compressed size limit")
+                  total = 0
+                  with response, archive_path.open("xb") as output:
+                      while True:
+                          chunk = response.read(1024 * 1024)
+                          if not chunk:
+                              break
+                          total += len(chunk)
+                          if total > 500 * 1024 * 1024:
+                              raise WorkflowError("The release archive exceeds the compressed size limit")
+                          output.write(chunk)
+                  break
+              else:
+                  raise WorkflowError("The release asset exceeded the redirect limit")
+          except (HTTPError, URLError, TimeoutError, OSError) as exc:
+              archive_path.unlink(missing_ok=True)
+              raise WorkflowError(f"Release asset download failed ({type(exc).__name__})") from None
+          except BaseException:
+              archive_path.unlink(missing_ok=True)
+              raise
+          print("Downloaded the pinned release asset to runner temp.")
+          PY
+
+      - name: Verify the pinned deployment archive and extract the site
+        env:
+          ARCHIVE_PATH: ${{ runner.temp }}/github-pages-site.zip
+          ARCHIVE_SHA256: ${{ inputs.archive_sha256 }}
+          CANDIDATE_REVISION: ${{ github.sha }}
+          OUTPUT_DIR: ${{ runner.temp }}/verified-pages-site
+        run: >-
+          python3 scripts/verify_deployment.py
+          --archive "$ARCHIVE_PATH"
+          --expected-sha256 "$ARCHIVE_SHA256"
+          --candidate-revision "$CANDIDATE_REVISION"
+          --output-dir "$OUTPUT_DIR"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the verified static site
+        uses: actions/upload-pages-artifact@v3
         with:
-          node-version: '22'
-      - run: npm ci --prefix frontend
-      - run: npm test --prefix frontend
-      - run: npm run build --prefix frontend
-      # Deployment is intentionally absent until root approves the verified public revision.
+          path: ${{ runner.temp }}/verified-pages-site/site
+
+      - name: Deploy the verified Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

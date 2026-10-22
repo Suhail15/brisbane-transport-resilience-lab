@@ -24,7 +24,7 @@ def coverage_report(archive):
             feeds[feed]={"receipts":len(valid),"expected_nominal":21600//cadence,"max_allowed_gap_seconds":limit,"gaps":gaps,"complete":not gaps}
         windows.append({"service_date":day.isoformat(),"start":start.isoformat(),"end":end.isoformat(),"feeds":feeds,"complete":all(f["complete"] for f in feeds.values())})
     with archive.connect() as db:recorded_gaps=[dict(r) for r in db.execute("SELECT * FROM gaps ORDER BY started_at")]
-    return {"timezone":"Australia/Brisbane","complete_weekday_windows":sum(w["complete"] for w in windows),"required_windows":5,"windows":windows,"recorded_failures":recorded_gaps,"definition":"Full six-hour receipt coverage for all three valid FULL_DATASET feeds; cadence +5 second maximum gap including window edges; excludes development captures","earliest_planned_complete_week":"2026-10-05 through 2026-10-09; future, not yet collected"}
+    return {"timezone":"Australia/Brisbane","complete_weekday_windows":sum(w["complete"] for w in windows),"required_windows":5,"windows":windows,"recorded_failures":recorded_gaps,"definition":"Full six-hour receipt coverage for all three valid FULL_DATASET feeds; cadence +5 second maximum gap including window edges; excludes development captures","earliest_planned_complete_week":"Initial target: 2026-10-05 through 2026-10-09; actual coverage is listed in windows"}
 
 def release_gate(archive):
     from .evidence import release_evidence

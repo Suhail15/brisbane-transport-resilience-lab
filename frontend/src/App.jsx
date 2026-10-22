@@ -3,6 +3,9 @@ import ReplayMap from './ReplayMap.jsx';
 import { AdapterError, createAdapter } from './api.js';
 import {
   countVehicleQuality,
+  DEFAULT_RECOVERY_FILTERS,
+  filterRecoveryRuns,
+  recoveryFilterOptions,
   defaultSnapshotIndex,
   eligibleStops,
   formatBrisbaneTimestamp,
@@ -22,6 +25,7 @@ const INITIAL_MODE = import.meta.env.VITE_DATA_MODE === 'static' ? 'static' : 'l
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/v1';
 const BUNDLE_URL = import.meta.env.VITE_BUNDLE_URL || './';
 const BUDGETS = [0, 2, 4, 8];
+const TRANSLINK_ATTRIBUTION = 'Contains public transport data provided by Translink (Department of Transport and Main Roads, Queensland) under CC BY 4.0. Translink does not endorse and is not affiliated with this independent project or its simulation outcomes.';
 const NAV_ITEMS = [
   { id: 'replay', label: 'Network & replay', icon: 'map' },
   { id: 'impact', label: 'Disruption impact', icon: 'pulse' },
@@ -165,6 +169,8 @@ function runSummary(run, snapshots) {
   return {
     snapshotId,
     sourceTime,
+    serviceDate: snapshot?.service_date,
+    scenarioKinds: scenarios.map((scenario) => scenario.kind ?? scenario.type).filter(Boolean),
     scenarioLabel: scenarioLabels.join(' · ') || (legacy ? 'Legacy recorded result' : 'Scenario summary not included'),
     scenarioWindow,
     budget,
@@ -332,8 +338,9 @@ function ReplayView({
       <section className="panel replay-panel">
         <div className="panel-heading replay-panel-heading">
           <div><span className="eyebrow">Recorded service</span><h2>{snapshot?.service_date ? 'Brisbane network' : 'Choose a recording'}</h2></div>
-          {catalog?.preview_only && <Badge tone="coral">Afternoon preview</Badge>}
+          {catalog?.preview_only && <Badge tone="coral">Private preview</Badge>}
         </div>
+        {catalog?.source_summary?.replay_label && <p className="next-gap-note">{catalog.source_summary.replay_label}</p>}
         <SnapshotControl snapshots={snapshots} snapshot={snapshot} selectedIndex={selectedIndex} onSelectIndex={onSelectIndex} playing={playing} onPlayToggle={onPlayToggle} speed={speed} onSpeedChange={onSpeedChange} />
         <div className="map-grid">
           <div className="map-wrap">
@@ -541,14 +548,25 @@ function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, 
   const [openedRun, setOpenedRun] = useState(null);
   const [openedError, setOpenedError] = useState('');
   const [opening, setOpening] = useState(false);
+  const [filters, setFilters] = useState(() => ({ ...DEFAULT_RECOVERY_FILTERS }));
+  const openingVersion = useRef(0);
+  const changeFilter = (key, value) => {
+    openingVersion.current += 1;
+    setFilters((previous) => ({ ...previous, [key]: value }));
+    setOpenedRun(null); setOpenedError(''); setOpening(false);
+  };
+  useEffect(() => () => { openingVersion.current += 1; }, []);
   const doneJobs = jobs.filter((job) => job.status === 'completed' && job.result);
   const savedOnly = savedRuns.filter((run) => !jobs.some((job) => job.run_id === (run.run_id ?? run.id)));
   const completedRuns = savedOnly.filter((run) => run.status === 'completed');
   const otherRuns = savedOnly.filter((run) => run.status !== 'completed');
+  const completedEntries = completedRuns.map((run) => ({ run, summary: runSummary(run, snapshots) }));
+  const filterOptions = recoveryFilterOptions(completedEntries);
+  const shownEntries = filterRecoveryRuns(completedEntries, filters);
+  const scenarioNames = { trip_cancellation: 'Trip cancellation', stop_unavailable: 'Stop closure', corridor_closure: 'Rail corridor closure', additional_delay: 'Bus delay', unknown: 'Scenario not included' };
   const runGroups = (() => {
     const groups = new Map();
-    for (const run of completedRuns) {
-      const summary = runSummary(run, snapshots);
+    for (const { run, summary } of shownEntries) {
       const id = run.run_id ?? run.id ?? 'unknown';
       const key = summary.groupKey ?? `single:${id}`;
       const group = groups.get(key) ?? { key, summary, runs: [] };
@@ -565,15 +583,17 @@ function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, 
   const openRun = async (run) => {
     const id = run.run_id ?? run.id;
     if (!id) return;
+    const version = ++openingVersion.current;
     setOpening(true); setOpenedError('');
     try {
       const payload = await adapter.getRun(id);
+      if (version !== openingVersion.current) return;
       const summary = runSummary({ ...run, ...payload }, snapshots);
       setOpenedRun({ run, payload, summary });
     } catch (error) {
-      setOpenedError(error.message);
+      if (version === openingVersion.current) setOpenedError(error.message);
     } finally {
-      setOpening(false);
+      if (version === openingVersion.current) setOpening(false);
     }
   };
 
@@ -584,7 +604,26 @@ function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, 
       </SectionHeading>
       <div className="comparison-intro"><div className="comparison-intro-mark"><Icon name="arrows" size={22} /></div><div><strong>Restoration comes first. Travel time breaks ties.</strong><span>Costs include two-hour bus duties. Bounded searches show the best plan they evaluated; they do not claim a global optimum.</span></div><button className="button button-small button-soft" onClick={onRefresh}><Icon name="refresh" size={15} /> Refresh runs</button></div>
       {doneJobs.length > 0 && <div className="comparison-results">{doneJobs.sort((a, b) => a.budget_bus_hours - b.budget_bus_hours).map((job) => <RecoveryCard key={job.run_id} job={job} network={job.snapshot_id === networkSnapshotId ? network : null} serviceDate={job.service_date || snapshots.find((item) => item.snapshot_id === job.snapshot_id)?.service_date} />)}</div>}
-      {completedRuns.length > 0 && <section className="panel saved-runs-panel"><div className="panel-heading"><div><span className="eyebrow">Recorded comparisons</span><h2>Completed results</h2></div><Badge>{completedRuns.length} complete</Badge></div>
+      {completedRuns.length > 0 && <section className="panel saved-runs-panel"><div className="panel-heading"><div><span className="eyebrow">Recorded comparisons</span><h2>Completed results</h2></div><Badge>{shownEntries.length} shown of {completedRuns.length} complete</Badge></div>
+        <div className="snapshot-line" role="group" aria-label="Filter recorded comparisons">
+          <label>Recording date<select value={filters.date} onChange={(event) => changeFilter('date', event.target.value)}>
+            <option value="">All dates</option>
+            {!filterOptions.dates.includes(filters.date) && filters.date && <option value={filters.date}>{filters.date} · no recorded runs</option>}
+            {filterOptions.dates.map((date) => <option key={date} value={date}>{date === 'unknown' ? 'Date not included' : date}</option>)}
+          </select></label>
+          <label>Scenario type<select value={filters.scenario} onChange={(event) => changeFilter('scenario', event.target.value)}>
+            <option value="">All scenarios</option>
+            {!filterOptions.scenarios.includes(filters.scenario) && filters.scenario && <option value={filters.scenario}>{scenarioNames[filters.scenario] || humanLabel(filters.scenario)} · no recorded runs</option>}
+            {filterOptions.scenarios.map((kind) => <option key={kind} value={kind}>{scenarioNames[kind] || humanLabel(kind)}</option>)}
+          </select></label>
+          <label>Bus running-time assumption<select value={filters.sensitivity} onChange={(event) => changeFilter('sensitivity', event.target.value)}>
+            <option value="">All assumptions</option>
+            {!filterOptions.sensitivities.includes(filters.sensitivity) && filters.sensitivity && <option value={filters.sensitivity}>{sensitivityLabel(Number(filters.sensitivity))} · no recorded runs</option>}
+            {filterOptions.sensitivities.map((seconds) => <option key={seconds} value={seconds}>{seconds === 'unknown' ? 'Assumption not included' : seconds === '0' ? 'Base running time' : `Hypothetical +${Number(seconds) / 60} minutes`}</option>)}
+          </select></label>
+        </div>
+        <p className="other-runs-note" role="status" aria-live="polite">{shownEntries.length} shown of {completedRuns.length} complete. Results retain their exact source, requests, scenario and assumptions.</p>
+        {shownEntries.length === 0 && <div className="empty-panel"><h3>No recorded results for this combination</h3><p>Choose another filter combination to inspect the included comparisons.</p></div>}
         <div className="saved-run-groups">{runGroups.map((group) => {
           const summary = group.summary;
           const sourceTime = summary.sourceTime ? `${formatBrisbaneTimestamp(summary.sourceTime)} Brisbane` : 'Source time not included in this index';
@@ -694,10 +733,10 @@ function EvidenceView({ catalog, snapshot, snapshots, display, choices, runs, lo
   return (
     <>
       <SectionHeading eyebrow="Source record & limitations" title="Evidence">
-        See what was recorded, when the data arrived, what is missing and which release checks remain open.
+        See what was recorded, when the data arrived, what is missing and how the simulation is constrained.
       </SectionHeading>
       <section className="panel evidence-current">
-        <div className="panel-heading"><div><span className="eyebrow">Selected recording</span><h2>{snapshot?.service_date || 'No date selected'}</h2></div><Badge tone="coral">Local preview</Badge></div>
+        <div className="panel-heading"><div><span className="eyebrow">Selected recording</span><h2>{snapshot?.service_date || 'No date selected'}</h2></div><Badge tone="coral">{catalog?.preview_only ? 'Private preview' : 'Recorded demo'}</Badge></div>
         <div className="evidence-grid">
           <EvidenceValue label="Snapshot received cutoff" value={formatBrisbaneTimestamp(snapshot?.snapshot_at, { dateStyle: 'full', timeStyle: 'medium' })} />
           <EvidenceValue label="Schedule" value={<StatusPill value={quality.schedule_status} />} />
@@ -709,6 +748,7 @@ function EvidenceView({ catalog, snapshot, snapshots, display, choices, runs, lo
           <EvidenceValue label="Recorded comparisons" value={formatCount(runs.length)} />
         </div>
         <div className="quality-labels">
+          {sourceSummary?.replay_label && <p>{sourceSummary.replay_label}</p>}
           <div><span className="eyebrow">Source statements</span><p>{display?.labels?.positions || 'Vehicle markers retain their source event and receipt times.'}</p><p>{display?.labels?.predictions || 'Predicted timestamps are not measured arrivals.'}</p><p>{display?.labels?.scenarios || 'Disruptions and recovery plans are hypothetical.'}</p></div>
           <div><span className="eyebrow">Current quality notes</span>{quality.warnings?.length ? <ul>{quality.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : <p>No quality warnings are attached to this recording.</p>}</div>
         </div>
@@ -728,14 +768,14 @@ function EvidenceView({ catalog, snapshot, snapshots, display, choices, runs, lo
           <div className="pilot-budget-grid"><EvidenceValue label="Maximum walk" value="600 m · 1.2 m/s" /><EvidenceValue label="Transfer allowance" value="300 seconds" /><EvidenceValue label="Vehicle changes" value="Up to 3" /><EvidenceValue label="Recovery budget" value="0, 2, 4 or 8 bus-hours" /></div>
           <p className="evidence-paragraph">Only actual GTFS shapes and directed OSM paths are used. Missing platform connections stay unresolved; map proximity does not create a walking route.</p>
           {fairfieldPlatforms.length > 0 && <div className="platform-evidence"><span className="eyebrow">Fairfield rail platforms in this timetable</span>{fairfieldPlatforms.map((stop) => <div key={stop.stop_id} className="platform-evidence-row"><span><strong>{stop.name}</strong><small>GTFS stop {stop.stop_id}</small></span><StatusPill value={stop.active_boardings > 0 ? 'verified' : 'missing'} label={stop.active_boardings > 0 ? `${stop.active_boardings} active pickups` : 'No active service'} /></div>)}<p>These platform ids remain visible in the source. No train service is inferred where the timetable has none.</p></div>}
-          <div className="release-gates"><div className="subsection-heading"><div><span className="eyebrow">Release checks</span><h3>{failedGateCount} checks still open</h3></div></div>{Object.entries(gates).map(([key, passed]) => <div key={key} className="release-gate-row"><span className={passed ? 'gate-check passed' : 'gate-check'}>{passed ? <Icon name="check" size={13} /> : '·'}</span><span>{releaseGateName(key)}</span><strong>{passed ? 'Complete' : 'Pending'}</strong></div>)}</div>
+          {catalog?.preview_only ? <div className="release-gates"><div className="subsection-heading"><div><span className="eyebrow">Release checks</span><h3>{failedGateCount} checks still open</h3></div></div>{Object.entries(gates).map(([key, passed]) => <div key={key} className="release-gate-row"><span className={passed ? 'gate-check passed' : 'gate-check'}>{passed ? <Icon name="check" size={13} /> : '·'}</span><span>{releaseGateName(key)}</span><strong>{passed ? 'Complete' : 'Pending'}</strong></div>)}</div> : <p className="evidence-paragraph">Release verification and reproducible findings are documented in the <a href="https://github.com/Suhail15/brisbane-transport-resilience-lab/blob/main/docs/RELEASE.md" target="_blank" rel="noreferrer">repository evidence</a>. This recorded demo does not provide live travel advice.</p>}
         </section>
       </div>
 
       <section className="panel source-credits">
         <div className="panel-heading"><div><span className="eyebrow">Attribution & terms</span><h2>Source credits</h2></div></div>
         <div className="source-credit-grid">
-          <div><span className="source-monogram">T</span><div><strong>Translink · Queensland Department of Transport and Main Roads</strong><p>Bus, rail and realtime inputs attributed under CC BY 4.0. This is an independent project and is not endorsed by Translink.</p><a href="https://translink.com.au/about-translink/open-data" target="_blank" rel="noreferrer">Translink open data ↗</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0 ↗</a></div></div>
+          <div><span className="source-monogram">T</span><div><strong>Translink · Queensland Department of Transport and Main Roads</strong><p>{TRANSLINK_ATTRIBUTION}</p><a href="https://translink.com.au/about-translink/open-data" target="_blank" rel="noreferrer">Translink open data ↗</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0 ↗</a></div></div>
           <div><span className="source-monogram osm-monogram">O</span><div><strong>OpenStreetMap contributors</strong><p>© OpenStreetMap contributors · ODbL 1.0. The extract is not historic.</p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Copyright and licence ↗</a></div></div>
         </div>
         {sourceSummary && <details className="provenance-details"><summary>Inspect bundle provenance</summary><pre>{JSON.stringify(sourceSummary, null, 2)}</pre></details>}
@@ -798,7 +838,8 @@ function App() {
     try {
       const [nextCatalog, nextRuns] = await Promise.all([adapter.getCatalog(), adapter.getRuns()]);
       const ordered = [...(nextCatalog.snapshots ?? [])].sort((a, b) => Date.parse(a.snapshot_at) - Date.parse(b.snapshot_at));
-      const initialIndex = defaultSnapshotIndex(ordered);
+      const preferredIndex = ordered.findIndex((item) => item.snapshot_id === nextCatalog.preferred_snapshot_id);
+      const initialIndex = preferredIndex >= 0 ? preferredIndex : defaultSnapshotIndex(ordered);
       if (!mountedRef.current) return;
       setCatalog(nextCatalog); setSnapshots(ordered); setSelectedIndex(Math.max(0, initialIndex));
       setSnapshotId(ordered[initialIndex]?.snapshot_id ?? ''); setSavedRuns(nextRuns);
@@ -988,7 +1029,7 @@ function App() {
             {page === 'recovery' && <RecoveryView jobs={jobs} savedRuns={savedRuns} snapshots={snapshots} network={network} networkSnapshotId={selectedSnapshot?.snapshot_id} adapter={adapter} onRefresh={() => void reloadCatalog()} mode={mode} />}
             {page === 'evidence' && <EvidenceView catalog={catalog} snapshot={selectedSnapshot} snapshots={snapshots} display={display} choices={choices} runs={savedRuns} loading={loadingFrame} />}
           </>}
-          <footer className="app-footer"><span>Brisbane Transport Resilience Lab</span><span>Recorded inputs · hypothetical scenarios</span></footer>
+          <footer className="app-footer"><span>Brisbane Transport Resilience Lab</span><span>Recorded inputs · hypothetical scenarios</span><span style={{ minWidth: 0, maxWidth: '70vw', textAlign: 'right', lineHeight: 1.5 }}>{TRANSLINK_ATTRIBUTION}</span></footer>
         </main>
       </div>
     </div>

@@ -1,45 +1,34 @@
-# Release preparation and verification
+# Release verification
 
-No data or site has been published by INT-003. Future complete mornings and
-publisher approval remain missing. The current release check fails by design.
+Release 1 uses three real recorded mornings (19–21 October 2026), 72 replay frames and 54 frozen comparisons. The source archive remains outside Git. Published recordings are compact, attributed derivatives; disruptions and recovery services are simulations. Read [findings](FINDINGS.md) for the measured outcome and its limits.
 
-`configs/release-evidence.json` schema 2 binds a candidate Git revision, exactly
-three selected complete morning dates and hashed reports for OTP, performance,
-licences, secrets, candidate CI, static walkthrough and public artifacts. A boolean
-and arbitrary reference cannot authorize release. Each report must identify its gate,
-revision, scope and passed actual checks with hashed evidence artifacts. Root or
-architecture acceptance must reference concrete reviewed bytes and their hash.
-Performance requires at least 100 measurements and p95 below two seconds; publisher
-approval must be received. Manual acceptance cannot replace absent recordings. Uncommitted executable/build
-inputs cannot inherit approval for HEAD; the code/build working tree must be clean.
-All nonignored staged/unstaged/untracked changes fail final authorization. Generated
-data packs remain ignored. Keep the committed config as a pending template; place
-actual candidate evidence in ignored `data/runtime/release-evidence.json` and set
-`RESILIENCE_RELEASE_EVIDENCE` to that path after freezing the candidate commit.
-This avoids a self-referential evidence/config commit revision.
+## Evidence and authorization
+
+`configs/release-evidence.json` is deliberately an empty template. Actual candidate evidence is generated locally in ignored storage and exported as reviewed release assets, avoiding a self-referential commit hash.
+
+Every gate report names the exact candidate Git revision, scope, hashed check artifacts and a concrete coordinator acceptance. The required gates are:
+
+- Five complete six-hour weekday recording windows; three selected morning dates.
+- A clean, frozen candidate revision.
+- Scoped independent OpenTripPlanner checks and documented disagreements.
+- At least 100 journey measurements with p95 below two seconds.
+- Source permissions, attribution and derivative database availability.
+- Credential/private-data inspection and successful candidate CI.
+- Browser walkthrough without the backend and exact public artifact verification.
+
+The release assets include reports, acceptance records, checksums and the exact deployed site identity. A checked box or an arbitrary filename cannot substitute for those artifacts. The publisher reply was supplied by the project owner; its sender headers were not authenticated by this software. The private correspondence and contact details are not redistributed.
 
 ## Two local phases
 
-1. Prepare an eligible public candidate projection locally with
-   `resilience export --public --candidate --output <fresh-directory>`. This requires
-   five complete weekday recording windows, exactly three selected complete mornings,
-   source provenance and licence/publisher eligibility. It uses the public integrity
-   and legacy exclusion rules. Artifact-dependent static/manifest/CI acceptance can
-   follow preparation; publication authorization remains false.
-2. Record the candidate's exact manifest hash in its accepted `public_artifacts`
-   report. Run `python scripts/verify_release.py --bundle <candidate-directory>`.
-   This checks the exact candidate file set and every manifest hash, rejects unsafe
-   paths and symlinks, binds the supplied manifest to the reviewed
-   identity and requires every final gate. A different bundle cannot inherit approval.
+1. Prepare a source-eligible public candidate with `python scripts/prepare_morning_bundle.py --public --candidate --output <new-directory>`. Set `RESILIENCE_RELEASE_EVIDENCE` to the ignored evidence file. This requires complete source windows, selected dates and reviewed licensing. The catalog retains its historical preparation state; that state does not authorize a deployment.
+2. After all artifact checks, run `python scripts/verify_release.py --bundle <candidate-directory>`. This checks the exact file set and manifest identity against the accepted report and requires every final gate. Another bundle cannot inherit approval.
 
-`.github/workflows/pages.yaml` is a guarded preparation harness. It verifies eligible
-immutable assets and runs mandatory frontend install/tests/build. It has no upload
-or deployment action. The root coordinator will add/execute the publication step only
-after final reviewed evidence passes, then verify public bytes/state against the
-prepared manifest. The current private preview fails the verifier; no credentials or
-remote visibility changes are involved.
+## Deployment boundary
 
-Backend CI remains the macOS/Windows/Linux Python matrix. Frontend CI now always
-requires the committed lock, installation, tests and production build. The older
-private Verification run 36965117356 at fec68f7 passed the backend matrix; a new run
-must validate the final candidate including the frontend.
+GitHub Pages serves the reviewed static site and cannot access the local raw archive or run custom calculations. The local application retains collection, routing and custom experiments. The public demo reads lazy replay bundles and completed comparisons with no backend dependency.
+
+The manually dispatched Pages workflow downloads `github-pages-site.zip` from the specified release in this repository. The dispatched ref, release tag and attested candidate must match. A pinned outer ZIP hash, a full site manifest (including HTML and JavaScript), a compact data manifest and eleven strictly true gates are checked by `scripts/verify_deployment.py` before extraction or deployment. No private source archive is required on the runner.
+
+Python verification runs on Linux, macOS and Windows. Frontend verification installs the lock, runs tests and builds production assets. The first public release is authorized only after candidate CI and the local checks pass; final public access and deployed data hashes are then checked separately.
+
+For reproduction use [REPRODUCTION.md](REPRODUCTION.md). Download the release's `verification-evidence.zip` and `SHA256SUMS.txt` for the candidate-specific proof. Later code changes require a fresh candidate and acceptance; an old green badge does not approve changed code or data.
