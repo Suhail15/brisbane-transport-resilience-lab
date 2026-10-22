@@ -33,7 +33,7 @@ Six weekday 06:00–12:00 collections were complete: 9, 13, 19, 20, 21 and 22 Oc
 
 An independent checker reconciled **54/54** final cases with their immutable inputs, source receipts, route arrays and duty constraints. Offline recomputation exactly reproduced **54/54** results in **508.35 seconds**. These checks establish reproducibility and the documented model accounting; they do not establish that predictions became observed arrivals.
 
-Local checks passed **204 Python tests** (one optional infrastructure check skipped), **28 frontend tests**, and **2/2** separately enabled live API/PostGIS checks. Final release-candidate CI remains a separate pending check.
+Local checks passed **206 Python tests** (one optional infrastructure check skipped), **28 frontend tests**, and **2/2** separately enabled live API/PostGIS checks. Final release-candidate CI remains a separate pending check.
 
 Independent OpenTripPlanner checks on the October 20 schedule retained raw agreement of **4/7 core cases** and **1/6 walking cases**. The walking equality was an absent-origin null result, not a transit match. Source-specific review checked 53 scheduled movements and 12 mapped walking paths with zero unexplained cases at that scope. Four original transit paths matched exactly; two additional direct-platform diagnostics were selected after the initial results. Differing access costs remain disclosed and uncalibrated. See the [reference validation](docs/REFERENCE_VALIDATION.md).
 

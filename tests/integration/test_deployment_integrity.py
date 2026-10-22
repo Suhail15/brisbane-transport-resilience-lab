@@ -268,6 +268,23 @@ def test_existing_output_directory_is_never_overwritten(tmp_path):
 def test_noncanonical_paths_are_rejected(tmp_path, path):
     archive_path, digest, candidate, _ = _build_package(tmp_path, extra_entries=[(path, b"bad")])
     with zipfile.ZipFile(archive_path) as archive:
-        assert path in archive.namelist()
+        # filename/namelist normalize backslashes again when reading on Windows.
+        # orig_filename is the raw central-directory spelling on every platform.
+        assert path in {info.orig_filename for info in archive.infolist()}
 
     _assert_rejected_without_output(archive_path, digest, candidate, tmp_path / "verified", "Unsafe|Absolute|Non-canonical|Drive-qualified")
+
+
+@pytest.mark.parametrize(
+    ("original", "normalized"),
+    [("site/a\\b", "site/a/b"), ("site/index.html\x00ignored", "site/index.html")],
+)
+def test_original_member_spelling_is_checked_before_host_normalization(original, normalized):
+    # Model ZipInfo's Windows separator normalization and all-host NUL truncation
+    # explicitly, so a POSIX test run also exercises the Windows security boundary.
+    info = zipfile.ZipInfo(original)
+    info.filename = normalized
+    assert info.orig_filename == original and info.filename != info.orig_filename
+
+    with pytest.raises(deployment.VerificationError, match="Unsafe"):
+        deployment._check_file_entry(info)

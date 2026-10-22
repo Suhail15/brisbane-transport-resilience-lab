@@ -80,7 +80,12 @@ def _safe_relative_path(value: str) -> str:
 
 
 def _check_file_entry(info: zipfile.ZipInfo) -> str:
+    # ZipInfo preserves the archive spelling here, but normalizes backslashes on
+    # Windows and truncates NULs in filename. Reject the original before either
+    # transformation can hide malformed member names from the path checks.
+    original_name = _safe_relative_path(info.orig_filename)
     name = _safe_relative_path(info.filename)
+    _require(name == original_name, f"Non-canonical ZIP filename normalization: {original_name!r}")
     _require(not info.is_dir(), f"Directory entries are not allowed: {name}")
     _require(not (info.flag_bits & 0x41), f"Encrypted ZIP entries are not allowed: {name}")
     _require(info.file_size >= 0 and info.compress_size >= 0, f"Invalid ZIP sizes: {name}")
