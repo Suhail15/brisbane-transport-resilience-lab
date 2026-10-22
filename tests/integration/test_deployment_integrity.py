@@ -103,7 +103,10 @@ def _build_package(
         warnings.simplefilter("ignore", UserWarning)
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for name, data, external_attr in entries:
+                # ZipInfo normalizes backslashes on Windows. Preserve the deliberately
+                # malformed member bytes so every OS tests the same rejection.
                 info = zipfile.ZipInfo(name)
+                info.filename = name
                 info.compress_type = zipfile.ZIP_DEFLATED
                 if external_attr is not None:
                     info.create_system = 3
@@ -264,5 +267,7 @@ def test_existing_output_directory_is_never_overwritten(tmp_path):
 )
 def test_noncanonical_paths_are_rejected(tmp_path, path):
     archive_path, digest, candidate, _ = _build_package(tmp_path, extra_entries=[(path, b"bad")])
+    with zipfile.ZipFile(archive_path) as archive:
+        assert path in archive.namelist()
 
     _assert_rejected_without_output(archive_path, digest, candidate, tmp_path / "verified", "Unsafe|Absolute|Non-canonical|Drive-qualified")
