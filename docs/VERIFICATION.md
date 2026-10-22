@@ -12,3 +12,7 @@ The first release evaluates three recorded mornings, 19–21 October 2026. Sourc
 See [reference validation](REFERENCE_VALIDATION.md), [findings](FINDINGS.md), [protocol](MORNING_EVALUATION.md) and [release evidence](RELEASE.md). Candidate CI, exact site identity, licensing, browser walkthrough, credential inspection and final public access are bound separately to each release; these local numbers cannot approve a changed candidate.
 
 [Earlier afternoon verification](DEVELOPMENT_VERIFICATION.md) is retained as development history, separate from final morning evidence. Windows collector installation and full operational bus availability remain outside the verified scope.
+
+## Published result
+
+The [v1.0.0 release record](releases/v1.0.0.md) links [successful candidate CI](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39717438183), [successful Pages deployment](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39718310864), all eleven accepted gates, exact manifests and the subsequent anonymous/public-browser verification. The static demo worked with the local backend stopped. The original tag dispatch failed the default main-branch environment rule; the identical commit deployed successfully from main.

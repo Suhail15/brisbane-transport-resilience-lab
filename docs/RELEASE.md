@@ -32,3 +32,9 @@ The manually dispatched Pages workflow downloads `github-pages-site.zip` from th
 Python verification runs on Linux, macOS and Windows. Frontend verification installs the lock, runs tests and builds production assets. The first public release is authorized only after candidate CI and the local checks pass; final public access and deployed data hashes are then checked separately.
 
 For reproduction use [REPRODUCTION.md](REPRODUCTION.md). Download the release's `verification-evidence.zip` and `SHA256SUMS.txt` for the candidate-specific proof. Later code changes require a fresh candidate and acceptance; an old green badge does not approve changed code or data.
+
+## Verified first release — 22 October 2026
+
+[Release v1.0.0](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/tag/v1.0.0) binds candidate `ada6368ec18f958cf276297c4b64ace25b27caa7`. [Candidate CI](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39717438183) and [Pages deployment](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39718310864) passed. All eleven local gates passed before publication; anonymous HTTP checks and the public browser comparison then passed. See [the complete release record](releases/v1.0.0.md).
+
+The default Pages environment permits the main branch. The initial tag dispatch was rejected before execution; dispatch from main at the identical verified commit succeeded. Tag, dispatched SHA and attestation still agree. No deployment restriction was broadened.

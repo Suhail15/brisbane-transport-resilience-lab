@@ -4,9 +4,13 @@ I built this lab to explore a practical question: when a Brisbane bus or rail se
 
 The pilot covers Fairfield/Annerley, South Bank and Brisbane CBD. I retain complete source trips and mapped pedestrian paths so the model can expose transfers and coverage gaps beyond the central map area.
 
-**[Recorded demo](https://Suhail15.github.io/brisbane-transport-resilience-lab/) — release deployment is being verified.** The final private package contains three recorded mornings, 72 sampled frames and 54 completed comparisons. Public access, final release CI and packaged-artifact checks remain pending; the link is not yet a verified live-release claim.
+**[Explore the recorded demo](https://suhail15.github.io/brisbane-transport-resilience-lab/) · [Source and release files](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/tag/v1.0.0)**
 
-Planned release assets: [short demo video](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/latest/download/demonstration.mp4) and [verification evidence / offline reproduction pack](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/latest). Asset uploads and public access are also being verified.
+Three real recorded mornings, 72 sampled frames and 54 completed comparisons. The public demo works without a local server. For the calculation inputs, independent checks and exact deployed identity, see the [verified release record](docs/releases/v1.0.0.md).
+
+[24-second browser walkthrough](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/download/v1.0.0/demonstration.mp4) · [Offline reproduction and evidence](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/tag/v1.0.0)
+
+![The public Brisbane Transport Resilience Lab replay](docs/screenshots/public-demo.jpg)
 
 ## What I found
 
@@ -33,7 +37,7 @@ Six weekday 06:00–12:00 collections were complete: 9, 13, 19, 20, 21 and 22 Oc
 
 An independent checker reconciled **54/54** final cases with their immutable inputs, source receipts, route arrays and duty constraints. Offline recomputation exactly reproduced **54/54** results in **508.35 seconds**. These checks establish reproducibility and the documented model accounting; they do not establish that predictions became observed arrivals.
 
-Local checks passed **206 Python tests** (one optional infrastructure check skipped), **28 frontend tests**, and **2/2** separately enabled live API/PostGIS checks. Final release-candidate CI remains a separate pending check.
+Local checks passed **206 Python tests** (one optional infrastructure check skipped), **28 frontend tests**, and **2/2** separately enabled live API/PostGIS checks. [Release-candidate CI](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39717438183) passed the Python matrix on Linux, macOS and Windows and the frontend install, tests and production build.
 
 Independent OpenTripPlanner checks on the October 20 schedule retained raw agreement of **4/7 core cases** and **1/6 walking cases**. The walking equality was an absent-origin null result, not a transit match. Source-specific review checked 53 scheduled movements and 12 mapped walking paths with zero unexplained cases at that scope. Four original transit paths matched exactly; two additional direct-platform diagnostics were selected after the initial results. Differing access costs remain disclosed and uncalibrated. See the [reference validation](docs/REFERENCE_VALIDATION.md).
 
@@ -92,9 +96,9 @@ flowchart LR
 
 ## Engineering and documentation
 
-I used Python, pandas, DuckDB and Parquet for processing; PostgreSQL/PostGIS and Redpanda for operational storage and event delivery; FastAPI for the local API; and React, JavaScript, Vite and MapLibre for the interface. Docker Compose and GitHub Actions support setup and verification. Raw archives, databases and private reproduction packs stay outside Git history. Compact recorded bundles support backend-free exploration.
+I used Python, pandas, DuckDB and Parquet for processing; PostgreSQL/PostGIS and Redpanda for operational storage and event delivery; FastAPI for the local API; and React, JavaScript, Vite and MapLibre for the interface. Docker Compose and GitHub Actions support setup and verification. Raw archives and databases stay outside Git history; the selected-source reproduction pack is distributed separately as a reviewed release asset. Compact recorded bundles support backend-free exploration.
 
-- [Final findings](docs/FINDINGS.md) and [evaluation method](docs/MORNING_EVALUATION.md)
+- [Final findings](docs/FINDINGS.md), [evaluation method](docs/MORNING_EVALUATION.md) and [verified portfolio wording](docs/PORTFOLIO.md)
 - [Independent routing review](docs/REFERENCE_VALIDATION.md) and [release checklist](docs/IMPLEMENTATION_CHECKLIST.md)
 - [Methodology](docs/METHODOLOGY.md), [contracts](docs/CONTRACTS.md) and [API](docs/API.md)
 - [Source attribution and publication conditions](docs/SOURCES.md)

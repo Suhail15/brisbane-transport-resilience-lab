@@ -37,22 +37,25 @@ Every stage and gate starts as **pending**. Change a status only after recording
 11. [x] **Report robustness findings — FINAL MORNING MATRIX AND PAIRED SENSITIVITY VERIFIED**
     Assess how findings change across source gaps, timing assumptions, disruption choices, and recovery constraints. Evidence: documented sensitivity runs and limitations tied to recorded inputs.
 
-12. [ ] **Build the product interface and package a static demo — PRIVATE MORNING PACKAGE VERIFIED; FINAL PUBLIC PACKAGE PENDING**
+12. [x] **Build the product interface and package a static demo — PUBLIC RELEASE VERIFIED**
     Build the replay/scenario interface and package a static, reproducible demo for review. Evidence: walkthrough tied to recorded morning bundles, clearly labeled observations and hypothetical scenarios, and setup instructions.
 
 ## Release gates
 
-All gates below remain pending until their evidence is linked. Routing validation means CSA compared independently with OpenTripPlanner; uncalibrated service performance indicators are not release claims.
+Release v1.0.0 passed all eleven machine-checked local gates and the subsequent public-access check. The immutable calculation/site candidate is `ada6368ec18f958cf276297c4b64ace25b27caa7`. Candidate-specific reports and acceptance hashes are in the [release evidence](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/tag/v1.0.0); the committed configuration remains an empty template for future candidates.
 
-- [x] **Five complete weekdays, 06:00–12:00 Brisbane — VERIFIED**: six dates October 9/13/19/20/21/22; 20,160 valid non-development captures, unchanged 35/35/65-second edge-inclusive limits. `docs/tasks/ARCH-007.md` and `data/processed/morning-evaluation-v1/coverage-at-preparation.json` record the audit.
-- [x] **Three recorded morning replay sets — VERIFIED PRIVATELY**: fixed October 19/20/21, 72 sampled frames and 54 completed cases; exact public package remains under the static-demo gate. `frames.json`, frozen targets and final report under `data/processed/morning-evaluation-v1/`.
-- [x] **Independent CSA/OpenTripPlanner verification and analytical tests — VERIFIED AT DOCUMENTED SCOPE**: 54/54 independent primary-run reconciliation; ARCH-008's 22 synthetic corruption/boundary checks passed. Morning OTP retains raw 4/7 core and 1/6 walking (the latter an absent-origin null), four original exact transit paths plus two post-initial diagnostics, 53 checked source movements, twelve walk paths and zero unexplained cases at the bounded review scope. See `REFERENCE_VALIDATION.md`, ARCH-008/009 and `independent-verification.json`. Release-candidate CI is a separate pending gate.
-- [x] **Performance and offline reproduction — VERIFIED AT MEASURED SCOPE**: 300 journey HTTP calls, worst-date p95 0.17285 s on Apple M2/16 GB; October 20/21 clients overlapped. Offline 225-file pack reproduced 54/54 exactly in 508.35 s. These are separate journey-query and total-reproduction scopes, not original recovery queue timings. Evidence: `data/runtime/release-2026-10-22/journey-performance-summary.json` and `reproduction-report.json`.
-- [ ] **Licences — FINAL PACKAGE BINDING PENDING**: Translink public terms and the user-supplied October 22 written reply reviewed, with required independent branding/simulation labels and exact attribution. Original sender headers/timestamp were not independently inspected. OSM remains separately ODbL. Root must bind the actual released contents/licence review to the final artifact. See `SOURCES.md`.
-- [ ] **Secrets — FINAL CANDIDATE REVIEW PENDING**: inspect exact tracked/released bytes and configuration for credentials, private data and machine-specific paths; historical scans do not certify the final candidate.
-- [ ] **CI — RELEASE CANDIDATE PENDING**: require successful GitHub Actions for the actual release revision and its commit/run reference.
-- [ ] **Static demo — FINAL PUBLIC PACKAGE/WALKTHROUGH PENDING**: private three-morning package and filtered UI are prepared; root must bind the final dist (including HTML/assets), verify the actual walkthrough and confirm the source/candidate/public flags. The compact data manifest alone is not a complete-site manifest.
-- [ ] **Public release and verification — PENDING**: after preceding gates pass, publish under the accepted authorization and verify actual public repository/demo access. Planned demo: https://Suhail15.github.io/brisbane-transport-resilience-lab/ . No live deployment success is claimed here.
+- [x] **Recording coverage:** six complete weekday 06:00–12:00 windows; unchanged edge-inclusive 35/35/65-second gap rules.
+- [x] **Three final mornings:** October 19/20/21; 72 sampled frames and 54 fixed comparisons. Development and reserve dates remain separate.
+- [x] **Independent verification:** 54/54 metric reconciliations; scoped OpenTripPlanner source review, with raw disagreement rates and access limitations retained.
+- [x] **Performance and reproduction:** 300 journey calls, worst-date p95 0.17285 s; 54/54 offline exact reproductions. The public pack preserves all primary inputs/results and has two additional direct recomputations.
+- [x] **Licences:** source terms and user-provided correspondence reviewed; exact attribution, independent branding, simulation notices and separately distributed ODbL walking derivative applied. Private correspondence excluded.
+- [x] **Privacy/credentials:** exact tracked source/history and selected public artifacts inspected; no known credential patterns or excluded private paths. This is a bounded inspection, not a universal secret detector.
+- [x] **Candidate and CI:** clean frozen candidate, [all four CI jobs passed](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39717438183); Windows raw-ZIP normalization regression resolved and covered.
+- [x] **Static application:** production build and actual browser walkthrough with the backend stopped; desktop/mobile, replay dates, all 54 filtered results, nominal/sensitivity details and source-quality labels checked.
+- [x] **Artifact integrity:** 399 deployment files verified against pinned archive, site and data manifests before extraction; all six uploaded release-asset digests match the reviewed files.
+- [x] **Publication:** repository public; [Pages deployment passed](https://github.com/Suhail15/brisbane-transport-resilience-lab/actions/runs/39718310864); unauthenticated access, eleven sampled deployed file hashes including every JavaScript/CSS asset and a selected result, six public release downloads and actual public browser comparison verified.
+
+See [the release record](releases/v1.0.0.md). The dated evidence log below preserves earlier pending states; it is historical context, not the current release status.
 
 ## Evidence log
 

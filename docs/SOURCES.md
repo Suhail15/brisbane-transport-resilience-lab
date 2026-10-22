@@ -42,7 +42,7 @@ retain their own timestamps; neither proves an observed passenger arrival.
 
 Public release must document Translink contact/approval handling, OSM derivative data
 licensing, and the exact compact bundle contents. Raw archives are local and ignored.
-Licence release gate remains false in configs/release-evidence.json. The sent request
+The committed configs/release-evidence.json remains an empty future-candidate template; actual accepted v1.0.0 evidence is distributed with the release. The sent request
 and private contact details are recorded under ignored data/runtime/ rather than in
 the public source repository.
 
@@ -56,3 +56,5 @@ were rechecked alongside the user-provided reply. Publisher handling is now supp
 by that correspondence rather than inferred from a public licence page. OSM-derived
 walking exports are separately offered under ODbL 1.0 with their source/derivation
 records. All remaining evidence gates continue to apply before publication.
+
+Release v1.0.0 was published on 22 October 2026 after all scoped source and artifact checks passed. The [public demo](https://suhail15.github.io/brisbane-transport-resilience-lab/) and [release evidence](https://github.com/Suhail15/brisbane-transport-resilience-lab/releases/tag/v1.0.0) retain attribution and simulation labels; the selected source reproduction pack and separate ODbL walking derivative are downloadable. Private correspondence and contact details remain outside the public repository and assets.
