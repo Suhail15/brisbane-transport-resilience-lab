@@ -377,3 +377,39 @@ publication authorization false. Final verification binds the exact candidate ma
 hash to accepted public_artifacts evidence and checks all files and final gates.
 This breaks the generation/acceptance dependency without bypassing release conditions;
 no phase publishes remotely. Details are in the ARCH-003 task brief.
+
+## Separate corridor-impact case study (2026-10-23)
+
+The next study is additive: original v1 results, inputs, numerical engine and the
+54-case evaluation remain unchanged. A compact `case-study.json` may be advertised
+by optional `catalog.case_study_url`. Both data adapters expose `getCaseStudy()`;
+an absent study returns null. The local API serves the reviewed compact study at
+`GET /v1/case-study` when available. No new calculation API is implied by this DTO.
+
+The presentation contract is approved independently of the pending analytical
+protocol. Schema version 1 has `study_id`, `title`, `question`, `disruption`,
+`classification`, `protocol` (including version, hash, selection rule and unchanged
+60/90-minute thresholds), `assumptions`, `dates`, and `evidence` links. Each date has
+`date`, `role`, `snapshot_id`, `snapshot_at`, `request_count`,
+`baseline_within60_count`, `disrupted_within60_count`, `lost_count`, `budgets`,
+`sensitivities` and nullable `example`.
+Optional `impacted_count` and `added_capped_duration_s` show nominal disruption
+exposure over the full primary denominator. A budget-specific `example` takes
+precedence over the date's fallback example, so changing budget cannot retain a
+different plan's recovered duration.
+
+Each budget has `budget_bus_hours`, `used_bus_hours`, `bus_count`, `restored_count`,
+`recovered_within60_count`, `saved_capped_duration_s`, `improved_count`,
+`saved_query_minutes_per_bus_hour` (null for zero cost), `run_id`, and `policies`.
+Policies name the compared choice and retain `restored_count`,
+`total_capped_duration_s`, and `used_bus_hours`; an unavailable policy is null,
+never zero. Sensitivities retain the same budget fields plus `additional_bus_seconds`.
+An example records a fixed request, named origin/destination, `departure_s`, and
+`baseline_duration_s`, `disrupted_duration_s`, `recovered_duration_s` (nullable).
+
+All durations and counts are derived model outputs, not observations of passengers.
+Query-minutes per bus-hour divide saved capped seconds by 60 and used bus-hours;
+this describes the fixed test workload and is not a financial return. Study date,
+role, cutoff and denominator must be visible independently of the replay selection.
+Null findings, sensitivity failures and cost-only ties must remain visible. The UI
+must not hard-code a positive recommendation or claim deployment/fleet feasibility.

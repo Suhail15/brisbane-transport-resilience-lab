@@ -239,3 +239,30 @@ Owner: ARCH-001, GPT-6.1 Sol, reasoning max.
     flag records generation history; only the separate all-gates attestation permits
     deployment. No credentials or private correspondence belong in the public ZIP.
     Root controls the workflow, final release evidence, public visibility and upload.
+29. **Separate corridor-impact protocol, coordinator approved 2026-10-23.**
+    User approved improving the demonstrated decision story. Preserve the released
+    v1 engine, 54 results and original evaluation; hash their files before work.
+    Freeze `configs/corridor-impact.v1.json` before confirmation policy runs.
+    Use 9/13 October for development, 19/20/21 as explicitly reused replication
+    dates and unused reserve 22 October for separate confirmation. Use the real
+    source rail section Fairfield–Central, a hypothetical two-hour closure and
+    exact source platform IDs for a 240-query interstation census. Score the old
+    100 queries as separate controls under the primary plans; do not pool weights.
+    No missing stop/path is repaired or excluded to manufacture a benefit.
+    Keep the existing 60/90-minute metrics, walking/transfer assumptions and pure
+    routing/recovery engine unchanged. For this study only, expand at most three
+    nominal relevant source bus pairs at fixed 10/25/40/55-minute activations,
+    twelve candidates maximum. Each is a hypothetical full two-hour bus duty.
+    Freeze identities across running-time stresses. Add a nominal frequency-ranked
+    same-pattern dispatch policy because a rail-only closure affects no source bus
+    trips and the old affected-bus heuristic is unavailable. This ranks service
+    supply, not passenger demand. All policies use identical inputs and requests.
+    Report full signed impacts, within-60-minute losses/restoration, unchanged
+    baseline-defined impacted cohort, separate controls and resource efficiency
+    in query-minutes per bus-hour, with null zero-cost ratios. No monetary or
+    achieved passenger savings claim is authorized. Publish all predeclared cells,
+    including nulls, stress failures and inefficient plans, as a separate case
+    study after independent reconciliation, reproduction and applicable release
+    gates. The fixed example is Fairfield p2→Central p1 at cutoff, regardless of
+    its recovery result. Source-defined missing Park Road and Roma Street's lack
+    of rail platforms 1/2 are respected; source IDs are never guessed by name.
