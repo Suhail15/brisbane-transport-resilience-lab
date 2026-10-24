@@ -1,0 +1,85 @@
+name: Draft-only case study offline review
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Unpublished draft release ID holding the normalized input ZIP
+        type: string
+        required: true
+      asset_id:
+        description: Draft input ZIP asset ID
+        type: string
+        required: true
+      zip_sha256:
+        description: Externally pinned input ZIP SHA-256
+        type: string
+        required: true
+      manifest_sha256:
+        description: Externally pinned original pack manifest SHA-256
+        type: string
+        required: true
+      mode:
+        description: Run reviewed development smoke before the full registered matrix
+        type: choice
+        options: [smoke, full]
+        default: smoke
+
+permissions:
+  contents: read
+
+concurrency:
+  group: case-study-offline-review
+  cancel-in-progress: false
+
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      cells: ${{ steps.cells.outputs.cells }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - id: cells
+        env:
+          REVIEW_MODE: ${{ inputs.mode }}
+        run: |
+          echo "cells=$(python3 scripts/review_case_study_pack.py matrix --mode "$REVIEW_MODE")" >> "$GITHUB_OUTPUT"
+  review:
+    needs: matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        cell: ${{ fromJson(needs.matrix.outputs.cells) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install reviewed locked runtime
+        run: python -m pip install -r requirements.lock.txt
+      - name: Verify pinned normalized input and return draft asset only
+        env:
+          REVIEW_TOKEN: ${{ github.token }}
+          REVIEW_RELEASE_ID: ${{ inputs.release_id }}
+          REVIEW_ASSET_ID: ${{ inputs.asset_id }}
+          REVIEW_ZIP_SHA256: ${{ inputs.zip_sha256 }}
+          REVIEW_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+          REVIEW_CELL: ${{ matrix.cell }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -B scripts/review_case_study_pack.py review \
+            --release-id "$REVIEW_RELEASE_ID" --asset-id "$REVIEW_ASSET_ID" \
+            --zip-sha256 "$REVIEW_ZIP_SHA256" --manifest-sha256 "$REVIEW_MANIFEST_SHA256" \
+            --cell "$REVIEW_CELL"
