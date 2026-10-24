@@ -28,14 +28,21 @@ class Schedule:
         self.calendar = read_table(self.z,"calendar.txt")
         self.exceptions = read_table(self.z,"calendar_dates.txt")
         self.feed_info = read_table(self.z,"feed_info.txt")
-        self.cache = archive.root / "processed" / receipt["sha256"]
-        self.cache.mkdir(parents=True,exist_ok=True)
+        lock_path = Path(lock_path)
         if lock_path.exists():
             self.pilot = json.loads(lock_path.read_text())
         else:
             self.pilot = self.resolve_pilot()
             lock_path.parent.mkdir(parents=True,exist_ok=True)
             lock_path.write_text(json.dumps(self.pilot,indent=2))
+        self.pilot_sha256 = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        if lock_path.resolve() == Path("configs/pilot.json").resolve():
+            self.cache = archive.root / "processed" / receipt["sha256"]
+        else:
+            # A filtered cache is valid only for these exact source and pilot bytes.
+            key = hashlib.sha256((receipt["sha256"] + "|" + self.pilot_sha256).encode()).hexdigest()
+            self.cache = archive.root / "processed" / ("schedule-" + key)
+        self.cache.mkdir(parents=True,exist_ok=True)
         # Select all versions with the locked public line names; GTFS route ids change.
         selected = self.routes[self.routes.route_short_name.isin(self.pilot["route_short_names"]) & self.routes.route_type.isin(["2","3"])]
         self.routes = selected

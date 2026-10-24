@@ -114,6 +114,18 @@ async def get_network(snapshot_id:str|None=None):
     if snapshot_id:snapshot_or_404(snapshot_id)
     return await asyncio.to_thread(network,archive,snapshot_id)
 
+@app.get("/v1/case-study")
+async def get_case_study():
+    path=archive.root/"processed"/"corridor-impact-v2"/"case-study.json"
+    if not path.is_file():raise HTTPException(404,"No prepared corridor case study")
+    study=json.loads(path.read_text())
+    # Prepared numerical records are immutable; hosting paths are a display concern.
+    prefix="https://suhail15.github.io/brisbane-transport-resilience-lab/"
+    for link in study.get("evidence",[]):
+        if link.get("url","").startswith(prefix+"data/"):
+            link["url"]=prefix+link["url"][len(prefix+"data/"):]
+    return study
+
 @app.get("/v1/snapshots")
 async def snapshots():return {"snapshots":snapshot_index(archive)}
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReplayMap from './ReplayMap.jsx';
+import CaseStudy from './CaseStudy.jsx';
 import { AdapterError, createAdapter } from './api.js';
 import {
   countVehicleQuality,
@@ -305,6 +306,7 @@ function VehicleCounts({ vehicles }) {
 function ReplayView({
   catalog, snapshot, snapshots, selectedIndex, onSelectIndex, playing, onPlayToggle,
   speed, onSpeedChange, display, choices, network, loading, loadError, onRetry,
+  caseStudy, onOpenStudy,
 }) {
   const [visibleLayers, setVisibleLayers] = useState({ bus: true, rail: true, stops: true, vehicles: true });
   const [selectedStop, setSelectedStop] = useState(null);
@@ -329,6 +331,7 @@ function ReplayView({
         Follow recorded positions at their source timestamps. Gaps stay visible; nothing is interpolated between captures.
       </SectionHeading>
       <ErrorNotice error={loadError} onRetry={onRetry} />
+      {caseStudy && <div className="comparison-intro"><div><strong>What if rail services stopped across Fairfield–Central for two hours?</strong><span>Explore the separate corridor study: disruption impact, extra-bus options and the cost of each plan.</span></div><button className="button button-small button-primary" onClick={onOpenStudy}>Explore rail closure</button></div>}
       <div className="summary-strip">
           <div className="summary-tile"><span>Recorded positions</span><strong>{loading && !display ? 'Loading…' : formatCount(vehicles.length)}</strong><small>From this exact frame</small></div>
         <div className="summary-tile"><span>Realtime source</span><StatusPill value={quality.realtime_status} /><small>Schedule: {humanLabel(quality.schedule_status)}</small></div>
@@ -545,7 +548,9 @@ function JobTile({ job }) {
   return <article className={`job-tile ${failed ? 'job-failed' : ''}`}><div className="job-top"><strong>{job.budget_bus_hours} bus-hour{job.budget_bus_hours === 1 ? '' : 's'}</strong><StatusPill value={job.status} /></div>{job.status === 'running' || job.status === 'queued' || job.status === 'submitting' || job.status === 'cancellation_requested' ? <><div className="progress-track"><span style={{ width: `${Math.max(4, (job.progress ?? 0) * 100)}%` }} /></div><small>{job.progress_details?.stage ? humanLabel(job.progress_details.stage) : humanLabel(job.status)}{Number.isFinite(job.progress_details?.evaluated_plan_count) ? ` · ${job.progress_details.evaluated_plan_count} plans checked` : ''}</small></> : completed ? <div className="job-outcome"><span><strong>{metrics?.restored_count ?? '—'}</strong> restored</span><span>{metrics?.lost_count ?? '—'} lost in test set</span></div> : <small>{job.error || 'No partial outcome was saved.'}</small>}</article>;
 }
 
-function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, adapter, onRefresh, mode }) {
+function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, adapter, onRefresh, mode, caseStudy }) {
+  const [studyView, setStudyView] = useState(() => jobs.length ? 'original' : 'case');
+  useEffect(() => { if (jobs.length) setStudyView('original'); }, [jobs.length]);
   const [openedRun, setOpenedRun] = useState(null);
   const [openedError, setOpenedError] = useState('');
   const [opening, setOpening] = useState(false);
@@ -600,6 +605,11 @@ function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, 
 
   return (
     <>
+      {caseStudy && <div className="comparison-intro" role="tablist" aria-label="Recovery studies">
+        <button className={`button button-small ${studyView === 'case' ? 'button-primary' : 'button-soft'}`} role="tab" aria-selected={studyView === 'case'} onClick={() => setStudyView('case')}>Rail closure case study</button>
+        <button className={`button button-small ${studyView === 'original' ? 'button-primary' : 'button-soft'}`} role="tab" aria-selected={studyView === 'original'} onClick={() => setStudyView('original')}>Original 54 comparisons</button>
+      </div>}
+      {caseStudy && studyView === 'case' ? <CaseStudy study={caseStudy} /> : <>
       <SectionHeading eyebrow="Recovery options" title="Recovery comparison">
         Read the returned plan beside simpler alternatives. Every result is tied to the same test journeys and scenario.
       </SectionHeading>
@@ -658,6 +668,7 @@ function RecoveryView({ jobs, savedRuns, snapshots, network, networkSnapshotId, 
         <RecoveryCard job={{ ...openedRun.run, input: openedRun.payload.input, result: openedRun.payload.result ?? openedRun.payload, budget_bus_hours: openedRun.payload.result?.budget_bus_hours ?? openedRun.payload.budget_bus_hours }} network={(openedRun.payload.snapshot_id ?? openedRun.run.snapshot_id) === networkSnapshotId ? network : null} serviceDate={snapshots.find((item) => item.snapshot_id === (openedRun.payload.snapshot_id || openedRun.run.snapshot_id))?.service_date} />
       </>}
       {!doneJobs.length && !completedRuns.length && <div className="empty-panel"><div className="empty-symbol large"><Icon name="arrows" size={25} /></div><h2>No completed recovery comparisons yet</h2><p>{mode === 'static' ? 'No completed runs are included in this recorded bundle. No comparison has been invented.' : 'Submit a disruption scenario to compare the returned plans at 0, 2, 4 and 8 bus-hours.'}</p><div className="empty-footnote">A two-hour duty uses one bus. Unreachable journeys remain in the 90-minute capped-time objective.</div></div>}
+      </>}
     </>
   );
 }
@@ -807,7 +818,7 @@ function releaseGateName(key) {
 function App() {
   const [mode, setMode] = useState(INITIAL_MODE);
   const adapter = useMemo(() => createAdapter(mode, { baseUrl: API_BASE_URL, bundleUrl: BUNDLE_URL }), [mode]);
-  const [page, setPage] = useState('replay');
+  const [page, setPage] = useState(() => globalThis.location?.hash === '#case-study' ? 'recovery' : 'replay');
   const [catalog, setCatalog] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [snapshotId, setSnapshotId] = useState('');
@@ -815,6 +826,7 @@ function App() {
   const [choices, setChoices] = useState(null);
   const [network, setNetwork] = useState(null);
   const [savedRuns, setSavedRuns] = useState([]);
+  const [caseStudy, setCaseStudy] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [loadingFrame, setLoadingFrame] = useState(false);
@@ -836,15 +848,16 @@ function App() {
 
   const reloadCatalog = useCallback(async () => {
     setLoadingCatalog(true); setLoadError(null); setCatalog(null); setSnapshots([]); setSnapshotId('');
-    setDisplay(null); setChoices(null); setNetwork(null); setSavedRuns([]); setJobs([]); setOpenedRun(null);
+    setDisplay(null); setChoices(null); setNetwork(null); setSavedRuns([]); setJobs([]); setOpenedRun(null); setCaseStudy(null);
     try {
-      const [nextCatalog, nextRuns] = await Promise.all([adapter.getCatalog(), adapter.getRuns()]);
+      const [nextCatalog, nextRuns, nextStudy] = await Promise.all([adapter.getCatalog(), adapter.getRuns(), adapter.getCaseStudy()]);
       const ordered = [...(nextCatalog.snapshots ?? [])].sort((a, b) => Date.parse(a.snapshot_at) - Date.parse(b.snapshot_at));
       const preferredIndex = ordered.findIndex((item) => item.snapshot_id === nextCatalog.preferred_snapshot_id);
       const initialIndex = preferredIndex >= 0 ? preferredIndex : defaultSnapshotIndex(ordered);
       if (!mountedRef.current) return;
       setCatalog(nextCatalog); setSnapshots(ordered); setSelectedIndex(Math.max(0, initialIndex));
       setSnapshotId(ordered[initialIndex]?.snapshot_id ?? ''); setSavedRuns(nextRuns);
+      setCaseStudy(nextStudy);
       if (!ordered.length) setLoadError(new Error('This data source has no recorded snapshots yet.'));
     } catch (error) {
       if (mountedRef.current) setLoadError(error);
@@ -1026,9 +1039,9 @@ function App() {
           {loadingCatalog && <div className="loading-state"><div className="spinner" /><span>Opening the recorded service bundle…</span></div>}
           {currentError && !catalog && <div className="empty-panel connection-panel"><div className="empty-symbol large"><Icon name="alert" size={24} /></div><h2>We couldn’t open this data source</h2><p>{currentError.message}</p><div className="connection-actions"><button className="button button-primary" onClick={() => void reloadCatalog()}>Try again</button><button className="button button-secondary" onClick={() => switchMode(mode === 'local' ? 'static' : 'local')}>Open {mode === 'local' ? 'static bundle' : 'local API'}</button></div><small>{mode === 'local' ? 'Start the replay service on 127.0.0.1:8000, or open the prepared static bundle.' : 'The static bundle must be available beside this site.'}</small></div>}
           {catalog && <>
-            {page === 'replay' && <ReplayView catalog={catalog} snapshot={selectedSnapshot} snapshots={snapshots} selectedIndex={selectedIndex} onSelectIndex={setFrameIndex} playing={playing} onPlayToggle={() => setPlaying((value) => !value)} speed={speed} onSpeedChange={setSpeed} display={display} choices={choices} network={network} loading={loadingFrame} loadError={loadError} onRetry={() => void reloadCatalog()} />}
+            {page === 'replay' && <ReplayView catalog={catalog} snapshot={selectedSnapshot} snapshots={snapshots} selectedIndex={selectedIndex} onSelectIndex={setFrameIndex} playing={playing} onPlayToggle={() => setPlaying((value) => !value)} speed={speed} onSpeedChange={setSpeed} display={display} choices={choices} network={network} loading={loadingFrame} loadError={loadError} onRetry={() => void reloadCatalog()} caseStudy={caseStudy} onOpenStudy={() => setPage('recovery')} />}
             {page === 'impact' && <ImpactView mode={mode} catalog={catalog} snapshot={selectedSnapshot} choices={choices} network={network} eligible={eligible} savedRunCount={savedRuns.length} kind={scenarioKind} setKind={setScenarioKind} targetId={scenarioTargetId} setTargetId={setScenarioTargetId} originId={originId} setOriginId={setOriginId} destinationId={destinationId} setDestinationId={setDestinationId} delayMinutes={delayMinutes} setDelayMinutes={setDelayMinutes} jobs={jobs} onRun={handleSubmit} onCancel={cancelActiveRuns} onNavigate={setPage} />}
-            {page === 'recovery' && <RecoveryView jobs={jobs} savedRuns={savedRuns} snapshots={snapshots} network={network} networkSnapshotId={selectedSnapshot?.snapshot_id} adapter={adapter} onRefresh={() => void reloadCatalog()} mode={mode} />}
+            {page === 'recovery' && <RecoveryView jobs={jobs} savedRuns={savedRuns} snapshots={snapshots} network={network} networkSnapshotId={selectedSnapshot?.snapshot_id} adapter={adapter} onRefresh={() => void reloadCatalog()} mode={mode} caseStudy={caseStudy} />}
             {page === 'evidence' && <EvidenceView catalog={catalog} snapshot={selectedSnapshot} snapshots={snapshots} display={display} choices={choices} runs={savedRuns} loading={loadingFrame} />}
           </>}
           <footer className="app-footer"><span>Brisbane Transport Resilience Lab</span><span>Recorded inputs · hypothetical scenarios</span><span style={{ minWidth: 0, maxWidth: '70vw', textAlign: 'right', lineHeight: 1.5 }}>{TRANSLINK_ATTRIBUTION}</span></footer>

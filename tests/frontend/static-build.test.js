@@ -117,6 +117,11 @@ test('lazy references must resolve to safely manifested local files', async (t) 
   await assert.rejects(verifyCompactBundle(f.source), /Unsafe path/);
   await update(f, 'experiments/run.json', { metadata_url: 'run-inputs/missing.json' });
   await assert.rejects(verifyCompactBundle(f.source), /Unmanifested bundle reference/);
+  const study = await fixture(t);
+  await update(study, 'catalog.json', { ...study.catalog, case_study_url: 'case-study.json' });
+  await assert.rejects(verifyCompactBundle(study.source), /Unmanifested bundle reference/);
+  await update(study, 'case-study.json', { schema_version: 1, study_id: 'fixture-only', dates: [] });
+  assert.equal((await verifyCompactBundle(study.source)).catalog.case_study_url, 'case-study.json');
 });
 
 test('separately licensed walking database is distributable without admitting a full timetable', async (t) => {

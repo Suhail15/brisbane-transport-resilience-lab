@@ -144,3 +144,22 @@ Comparisons must match snapshot/cutoff, journey version, request/scenario/candid
 hashes, sensitivity assumptions, method/objective/candidate selection versions and
 swap bound. Budget alone is allowed to differ. A larger budget or a different stress
 level must not silently inherit another comparison group.
+
+## Separate corridor case study
+
+`GET /v1/case-study` returns the optional prepared `corridor-impact-v2` summary,
+or 404 when it has not been prepared. It does not start a calculation. The static
+catalog's optional `case_study_url` points to the manifest-bound `case-study.json`.
+Both adapters return the same display contract from [contracts](CONTRACTS.md).
+
+The case study has its own source-expanded network, receipt cutoff, 240 primary
+requests and separately scored 100 control requests. Its date selector is
+independent of the original replay selector. Do not join or pool its metrics
+with the original 54 comparisons, or imply that its added bus services appear
+in the original replay. Each date contains all four nominal budgets and the
+two-bus-hour 0/300/600-second sensitivity cases. Policy comparisons retain actual
+bus-hours used, full fixed-query denominators and unavailable outcomes.
+
+The browser reads compact completed results. Exact full-timetable routes,
+immutable source references and offline recomputation are provided separately;
+the static browser never submits a custom optimization job.

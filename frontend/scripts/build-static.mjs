@@ -82,7 +82,7 @@ export async function verifyCompactBundle(sourceDirectory) {
       }
       if (path === 'catalog.json') {
         catalog = document;
-        checkFields(document, ['network_url']);
+        checkFields(document, ['network_url', 'case_study_url']);
         for (const snapshot of document.snapshots ?? []) checkFields(snapshot, snapshotFields);
       } else if (path === 'snapshots/index.json') {
         for (const snapshot of document.snapshots ?? []) checkFields(snapshot, snapshotFields);

@@ -99,6 +99,10 @@ export function createLocalAdapter({
   return {
     mode: 'local',
     getCatalog: () => get('/catalog'),
+    getCaseStudy: async () => {
+      try { return await get('/case-study'); }
+      catch (error) { if (error.status === 404) return null; throw error; }
+    },
     getSnapshots: async () => (await get('/snapshots')).snapshots ?? [],
     getNetwork: (snapshotId) => get(`/network?snapshot_id=${encodeURIComponent(snapshotId)}`),
     getDisplay: (snapshotId) => get(`/snapshots/${encodeURIComponent(snapshotId)}/display`),
@@ -141,6 +145,14 @@ export function createStaticAdapter({
   return {
     mode: 'static',
     getCatalog: catalog,
+    getCaseStudy: async () => {
+      const value = await catalog();
+      if (!value.case_study_url) return null;
+      if (value.case_study_url !== 'case-study.json') {
+        throw new AdapterError('The case-study file reference is not supported.', { mode: 'static' });
+      }
+      return fetchFile(value.case_study_url);
+    },
     getSnapshots: async () => (await catalog()).snapshots ?? [],
     getNetwork: async (snapshotId) => {
       const snapshot = await findSnapshot(snapshotId);

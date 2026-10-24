@@ -28,6 +28,28 @@ function jsonResponse(body, status = 200, headers = {}) {
   return byteResponse(JSON.stringify(body), status, headers);
 }
 
+test('case study is optional locally and uses only the advertised compact static file', async () => {
+  const study = { schema_version: 1, study_id: 'fixture-study', dates: [] };
+  const missing = createLocalAdapter({ fetcher: async () => jsonResponse({ detail: 'No prepared study' }, 404) });
+  assert.equal(await missing.getCaseStudy(), null);
+  const local = createLocalAdapter({ fetcher: async (url) => {
+    assert.equal(url, 'http://127.0.0.1:8000/v1/case-study');
+    return jsonResponse(study);
+  } });
+  assert.deepEqual(await local.getCaseStudy(), study);
+  const requests = [];
+  const recorded = createStaticAdapter({ pageUrl: 'https://example.com/lab/', fetcher: async (url) => {
+    requests.push(url);
+    return jsonResponse(url.endsWith('catalog.json') ? { case_study_url: 'case-study.json' } : study);
+  } });
+  assert.deepEqual(await recorded.getCaseStudy(), study);
+  assert.deepEqual(requests, ['https://example.com/lab/catalog.json', 'https://example.com/lab/case-study.json']);
+  const legacy = createStaticAdapter({ fetcher: async () => jsonResponse({ snapshots: [] }) });
+  assert.equal(await legacy.getCaseStudy(), null);
+  const invalid = createStaticAdapter({ fetcher: async () => jsonResponse({ case_study_url: 'https://other.example/private' }) });
+  await assert.rejects(invalid.getCaseStudy(), /reference is not supported/);
+});
+
 test('local adapter maps approved paths and sends the immutable experiment shape', async () => {
   const calls = [];
   const adapter = createLocalAdapter({

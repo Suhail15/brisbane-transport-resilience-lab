@@ -61,12 +61,13 @@ def realtime_updates(archive,receipt,as_of,day,trip_meta,stop_times):
     diagnostics["by_route_mode"]=(rows.groupby(["route_id","mode","status"],dropna=False).size().reset_index(name="entities").where(pd.notna(rows.groupby(["route_id","mode","status"],dropna=False).size().reset_index(name="entities")),None).to_dict("records") if not rows.empty else [])
     return updates,diagnostics
 
-def build_snapshot(archive,as_of,*,store=True,include_realtime=True):
+def build_snapshot(archive,as_of,*,store=True,include_realtime=True,pilot_path=None):
     if as_of.utcoffset() is None:raise ValueError("as_of requires timezone")
     as_of=as_of.astimezone(timezone.utc)
     schedule_receipt=archive.latest("GTFS",as_of)
     if not schedule_receipt:raise ValueError("No GTFS received before as_of; current download cannot reconstruct earlier history")
-    schedule=Schedule(archive,schedule_receipt)
+    pilot_path=Path(pilot_path) if pilot_path is not None else Path("configs/pilot.json")
+    schedule=Schedule(archive,schedule_receipt,lock_path=pilot_path)
     day=as_of.astimezone(BRISBANE).date();midnight=datetime.combine(day,time(),BRISBANE)
     def epoch_s(value):return int((datetime.fromtimestamp(value,timezone.utc)-midnight).total_seconds())
     active=schedule.dated_trips(day);meta=active.set_index("trip_id").to_dict("index")
@@ -138,7 +139,7 @@ def build_snapshot(archive,as_of,*,store=True,include_realtime=True):
     else:status="fresh"
     warnings.extend(["Predicted feed times are not measured arrivals", "Scheduled fallback applies to unmatched, missing or stale trip entities", "Walking coverage incomplete; unavailable platform paths cannot be inferred", capture_quality_warning(as_of)])
     quality=QualityMetadata(realtime_status=status,schedule_status="verified" if schedule_age<86400 else "unverified",walking_status="incomplete" if osm else "missing",realtime_age_seconds=age,source_event_age_seconds=int((as_of-datetime.fromisoformat(tu["event_at"])).total_seconds()) if tu and tu["event_at"] else None,warnings=tuple(warnings))
-    method_digest=hashlib.sha256(b"pipeline-v2"+b"".join(Path(p).read_bytes() for p in (Path(__file__),Path(__file__).with_name("walking.py"),Path(__file__).with_name("schedule.py"),Path(__file__).parents[1]/"contracts.py",Path("configs/pilot.json")))).hexdigest()
+    method_digest=hashlib.sha256(b"pipeline-v2"+b"".join(Path(p).read_bytes() for p in (Path(__file__),Path(__file__).with_name("walking.py"),Path(__file__).with_name("schedule.py"),Path(__file__).parents[1]/"contracts.py",pilot_path))).hexdigest()
     sid=hashlib.sha256((as_of.isoformat()+"|"+"|".join(sorted(r["record_id"] for r in receipts))+"|pilot-v1|"+str(include_realtime)+"|"+method_digest).encode()).hexdigest()[:24]
     snapshot=TimetableSnapshot(metadata=SnapshotMetadata(snapshot_id=sid,snapshot_at=as_of,service_date=day,sources=tuple(source_record(r) for r in receipts),quality=quality),stops=stops,connections=tuple(connections),walking_links=links,recovery_pairs=pairs)
     out=archive.root/"processed"/"snapshots";out.mkdir(parents=True,exist_ok=True)
