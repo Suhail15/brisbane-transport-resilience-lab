@@ -76,3 +76,31 @@ their original docstrings. This prevents an existing editable installation from
 silently supplying package code during reproduction. The projection report binds
 the original and final manifest hashes, exact initializer bytes and unchanged
 calculation-code identity.
+
+### Optional GitHub-hosted verification
+
+The manually dispatched `case-study-review.yaml` workflow is an execution option
+for the same frozen calculations. It does not collect live feeds, improve the
+search algorithm or authorize publication. Local reproduction above remains the
+simpler route for an external reviewer.
+
+A maintainer first prepares and inspects the normalized pack, records the ZIP and
+manifest hashes outside it, and uploads it to an **unpublished draft release** in
+this repository. The workflow takes that draft's release/asset IDs and both hashes.
+Use `smoke` for the single development cell, inspect its returned complete result
+against local evidence, and only then consider `full` for the registered 24-cell
+matrix. No full input archive or private correspondence belongs in this pack.
+
+Each job starts a fresh Python process with the locked dependencies and frozen
+pack code. It checks the exact manifest before imports, begins with an empty route
+cache, denies upstream access and compares complete results, including route
+arrays. Only the transport parent receives the short-lived GitHub token. The
+result is returned to the same draft as a gzip JSON asset with run, commit, input,
+code and cell identities; a maintainer must download, hash and reconcile every
+unique expected cell before recording reproduction as complete.
+
+**Do not use public Actions artifacts for unreleased inputs or outcomes.** This
+workflow uses draft assets and generic public logs. Publishing its staging draft
+would expose those assets; keep it unpublished. A green workflow alone is not the
+final public release gate. Runner cancellation, timeout, mismatches and incomplete
+matrices remain failures or incomplete evidence.

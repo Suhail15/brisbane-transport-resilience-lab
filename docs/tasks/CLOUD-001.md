@@ -1,6 +1,6 @@
 # CLOUD-001 — Draft-only offline cell verification
 
-- Status: implemented locally; coordinator source review and cloud smoke pending
+- Status: reviewed and committed; one actual development smoke running; full registered verification pending
 - Owner: integration engineer
 - Reviewer: root
 
@@ -76,7 +76,7 @@ a generic completion message; private child output is temporary and removed.
   limits. Exact24 plus separate smoke selection and the reviewed local fixture's
   pinned manifest/tamper gate pass. Seven self-contained fresh-subprocess cases prove exact full-route match, tampered-but-re-signed stored-result rejection, nonempty-cache rejection, network denial, credential-environment rejection, non-frozen preloaded-module rejection, and successful parent transport with all job/runtime tokens removed from the actual child. These tiny synthetic modules test wrapper boundaries only; they are not observed study outcomes or numerical parity evidence. Tests never contact GitHub.
 - [x] Smoke matrix command emits only `2026-10-09:2:0`; full mode has 24 unique cells.
-- [ ] Coordinator source/workflow review before commit or external execution.
+- [x] Coordinator and independent architecture review completed before external execution;32 focused checks passed again. Source committed as `b2e78fd` before dispatch.
 - [ ] Actual cloud smoke with frozen normalized inputs, draft-only returned asset,
   full route equality, module/environment provenance and independent asset review.
 - [ ] Full registered 24 result assets and independent exact-identity aggregation.
@@ -86,7 +86,7 @@ production and the approved two-worker local offline fallback remain available.
 
 ## Escalation issues
 
-No cloud authentication or packaging attempts have occurred. Abort acceleration
+Root created an unpublished draft and uploaded the reviewed 9,208,096-byte normalized development ZIP; run `40086983590` executes only9October/budget2/delta0. The input ZIP SHA-256 is `3faf66d07a93ef64506f5c30d2a645edd1283f5a244f756c3b2128791567a359`; manifest SHA-256 is `174d55bfeaa05b01051cda09125837ad65ee6a82646960639c1e3aca0f18fb26`. No raw archive was transferred. A successful dispatch is not completed reproduction. Abort acceleration
 after two repeated authentication/packaging failures and preserve bounded evidence;
 do not alter frozen calculations to obtain a result. This implementation is
 limited to 60 minutes of setup/review. A cloud runner failure or mismatch must not

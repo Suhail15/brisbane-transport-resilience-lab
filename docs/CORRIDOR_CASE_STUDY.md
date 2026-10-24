@@ -117,5 +117,39 @@ Realistic small or null recovery results will remain in the report.
 
 ## Results and reproduction
 
-Corrected-network development and confirmation calculations are pending. This
-method record is not evidence of a recovery benefit or completed publication.
+### Interim checked results — 24 October 2026
+
+The corrected-network development runs are complete. Independent reconciliation
+passed all twelve development cells. On 9 October, nominal extra-bus gains were
+entirely outside the closure-delayed cohort; they must not be called closure
+recovery. On 13 October, eight bus-hours saved 74.73 query-minutes among the delayed
+cohort, about 4% of its added capped journey time.
+
+The separate 22 October confirmation recording and the 20 October replication
+have now completed all six cells each. Independent source, path, duty and arithmetic
+reconciliation passed these twelve cells, with all 530 original protected artifacts
+unchanged. The remaining 19/21 October replication searches and the clean offline
+recomputation gate are still running or pending. These are interim findings,
+not an updated public release.
+
+| Date | Nominal closure-delayed queries / 240 | Added capped query-minutes | Best saved at 2 / 4 / 8 bus-hours |
+|---|---:|---:|---:|
+| 22 October, confirmation | 210 | 1,825.53 | 25.53 / 42.80 / 50.13 minutes |
+| 20 October, reused-date replication | 208 | 1,820.13 | 25.53 / 46.53 / 53.87 minutes |
+
+All nominal savings shown in this table occur among the closure-delayed cohort.
+All 240 queries remain reachable within 60 minutes in every saved cell on these
+two dates; lost and restored counts are zero. At eight bus-hours, the reduction
+is only 2.75% and 2.96% of the added capped duration. Moving from four to eight
+bus-hours saves another 7.33 query-minutes on either date. The frequency-ranked
+policy saves 5.23 query-minutes on 22 October and zero on 20 October at each positive
+nominal budget, while using the full budget.
+
+The search optimizes the 240 primary queries. It can perform worse than the simple
+policy on the separate 100 controls; those results remain separate. Travel-time
+reachability does not establish that existing buses have enough capacity.
+
+Runtime evidence is retained locally in
+`data/runtime/release-2026-10-24/registered-first-two-verification.json`.
+Final public inputs, downloadable reproduction files and complete four-date
+results will be linked after their release checks pass.

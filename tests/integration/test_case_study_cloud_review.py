@@ -92,11 +92,18 @@ def test_untrusted_transport_rejected(url):
 def test_unsafe_zip_rejected(tmp_path, name, mode, content, reason):
     archive = tmp_path / 'input.zip'
     with zipfile.ZipFile(archive, 'w') as output:
-        item = zipfile.ZipInfo(name.replace('\x00', 'X'))
+        # Inject unsafe bytes after serialization: Windows ZipInfo otherwise
+        # normalizes backslashes before the extractor can inspect them.
+        serialized_name = name.replace('\x00', 'X').replace('\\', '_')
+        item = zipfile.ZipInfo(serialized_name)
         item.external_attr = mode << 16
         output.writestr(item, content)
-    if '\x00' in name:
-        archive.write_bytes(archive.read_bytes().replace(name.replace('\x00', 'X').encode(), name.encode()))
+    if serialized_name != name:
+        payload = archive.read_bytes()
+        assert payload.count(serialized_name.encode()) == 2
+        archive.write_bytes(payload.replace(serialized_name.encode(), name.encode()))
+    with zipfile.ZipFile(archive) as source:
+        assert source.infolist()[0].orig_filename == name
     with pytest.raises(review.ReviewError, match=reason):
         review.safe_extract(archive, tmp_path / 'pack')
     assert not (tmp_path / 'escape').exists()
