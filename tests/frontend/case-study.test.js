@@ -91,7 +91,15 @@ test('case study renders selected date context, fixed-query counts, budget contr
   assert.match(html, /Study role/);
   assert.match(html, /Confirmation/);
   assert.match(html, /Snapshot cutoff · Brisbane/);
-  assert.match(html, /2 in the denominator/);
+  assert.match(html, /Fixed test journeys · denominator/);
+  assert.match(html, /aria-label="Study date"/);
+  assert.match(html, /aria-label="Bus-hour budget"/);
+  assert.ok(html.indexOf('Snapshot cutoff · Brisbane') < html.indexOf('Baseline reachable'));
+  assert.ok(html.indexOf('Simulated disruption') < html.indexOf('Baseline reachable'));
+  const detailsStart = html.indexOf('<details class="cstudy-panel cstudy-method">');
+  assert.ok(detailsStart > html.indexOf('Baseline reachable'));
+  assert.ok(html.indexOf('fixture-snapshot-a') > detailsStart);
+  assert.ok(html.indexOf('fixture-hash') > detailsStart);
   assert.match(html, /Baseline reachable/);
   assert.match(html, /2 \/ 2/);
   assert.match(html, /During disruption/);

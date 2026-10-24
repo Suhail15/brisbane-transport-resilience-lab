@@ -101,7 +101,7 @@ export function resolveCaseStudySelection(study, dateChoice = '', budgetChoice =
 
 export function stressAvailabilityMessage(budgetBusHours) {
   return budgetBusHours === 2
-    ? 'These rows show the two bus-hour budget under each included running-time assumption. They are hypothetical sensitivity cases, not observed delays.'
+    ? 'Each row compares the same two bus-hour budget under an assumed running-time increase for existing and extra buses. Lost and restored journeys are calculated within that row. These are hypothetical sensitivity cases, not observed delays.'
     : 'This study tests running-time stress at two bus-hours. Select 2 bus-hours to view those sensitivity results.';
 }
 
@@ -169,24 +169,31 @@ function CaseStudy({ study }) {
     </div>}
 
     {hasStudy && <>
-      <Section eyebrow="Disruption story" title={study.disruption ? 'What changes in this scenario' : 'Disruption details'} className="cstudy-story">
-        <p>{study.disruption || 'Disruption description not included.'}</p>
-        <p className="cstudy-limit">This is a simulated service scenario with hypothetical recovery duties. Results describe fixed test journeys, not passenger outcomes or fleet availability.</p>
-      </Section>
-
-      <Section eyebrow="Study record" title="Choose a study date" className="cstudy-controls-panel">
-        {dates.length ? <div className="cstudy-control-grid">
-          <label className="cstudy-control"><span>Study date</span><select value={selectedDate?.date ?? ''} onChange={(event) => changeDate(event.target.value)}>
-            {dates.map((item, index) => <option key={`${item?.date ?? 'date'}-${index}`} value={item?.date ?? ''}>{item?.date ?? 'Date not included'} · {formatLabel(item?.role) || 'role not included'}</option>)}
-          </select></label>
-          <div className="cstudy-date-meta">
-            <span><strong>Study role</strong>{formatLabel(selectedDate?.role) || 'Not included'}</span>
-            <span><strong>Snapshot cutoff · Brisbane</strong>{formatTimestamp(selectedDate?.snapshot_at)}</span>
-            <span><strong>Snapshot ID</strong>{selectedDate?.snapshot_id ?? 'Not included'}</span>
-            <span><strong>Fixed test journeys</strong>{formatCount(selectedDate?.request_count)} in the denominator</span>
+      <section className="cstudy-overview" aria-label="Study context">
+        <section className="cstudy-panel cstudy-context-panel">
+          <div className="cstudy-selectors">
+            {dates.length ? <label className="cstudy-control"><span>Study date</span><select aria-label="Study date" value={selectedDate?.date ?? ''} onChange={(event) => changeDate(event.target.value)}>
+              {dates.map((item, index) => <option key={`${item?.date ?? 'date'}-${index}`} value={item?.date ?? ''}>{item?.date ?? 'Date not included'} · {formatLabel(item?.role) || 'role not included'}</option>)}
+            </select></label> : <div className="cstudy-empty-inline">No study dates are included in this record.</div>}
+            <label className="cstudy-control"><span>Bus-hour budget</span><select aria-label="Bus-hour budget" value={selectedBudget?.budget_bus_hours ?? ''} onChange={(event) => setBudgetChoice(event.target.value)} disabled={!budgets.length}>
+              {budgets.length ? budgets.map((item, index) => <option key={`${item?.budget_bus_hours ?? 'budget'}-${index}`} value={item?.budget_bus_hours ?? ''}>{formatBusHours(item?.budget_bus_hours)}</option>) : <option value="">No budget results</option>}
+            </select></label>
           </div>
-        </div> : <div className="cstudy-empty-inline">No study dates are included in this record.</div>}
-      </Section>
+          {selectedDate && <div className="cstudy-date-meta">
+            <span><strong>Study role</strong>{formatLabel(selectedDate.role) || 'Not included'}</span>
+            <span><strong>Snapshot cutoff · Brisbane</strong>{formatTimestamp(selectedDate.snapshot_at)}</span>
+            <span><strong>Fixed test journeys · denominator</strong>{formatCount(selectedDate.request_count)}</span>
+          </div>}
+          {selectedBudget?.run_id && <span className="cstudy-run-id">Run ID {selectedBudget.run_id}</span>}
+        </section>
+
+        <section className="cstudy-panel cstudy-story">
+          <span className="cstudy-eyebrow">Simulated disruption</span>
+          <h2>{study.disruption ? 'What changes in this scenario' : 'Disruption details'}</h2>
+          <p>{study.disruption || 'Disruption description not included.'}</p>
+          <p className="cstudy-limit">Recovery duties are hypothetical. Results describe fixed test journeys, not passenger outcomes or fleet availability.</p>
+        </section>
+      </section>
 
       {selectedDate && <>
         <Section eyebrow="Reachability under disruption" title="Fixed query set · 60-minute threshold" className="cstudy-reachability">
@@ -200,7 +207,7 @@ function CaseStudy({ study }) {
             {hasAddedCappedDuration && <Metric label="Added capped time across all fixed queries" value={formatDuration(selectedDate.added_capped_duration_s)} detail={`${formatCount(selectedDate.added_capped_duration_s)} exact seconds · 90-minute cap per query`} />}
             {hasAddedCappedDuration && <Metric label="Mean added seconds per fixed query" value={meanAddedSeconds === null ? 'Not available' : Number.isFinite(meanAddedSeconds) ? `${formatMeasure(meanAddedSeconds)} seconds` : selectedDate.request_count === 0 ? 'Not defined · no test queries' : 'Not included'} detail={`Across ${formatCount(selectedDate.request_count)} fixed test queries`} />}
           </div>}
-          <p className="cstudy-footnote">Study date and denominator are shown above independently of the replay selection. Counts are model outputs for a fixed test workload, not passenger reachability.</p>
+          <p className="cstudy-footnote">This study date is independent of the replay selection. Counts are model outputs for a fixed test workload, not passenger reachability.</p>
         </Section>
 
         <Section eyebrow="Recovery budget" title="Cost and outcome comparison" className="cstudy-budget">
@@ -216,12 +223,6 @@ function CaseStudy({ study }) {
               </tr>)}</tbody>
             </table>
           </div>
-          <div className="cstudy-budget-control-row">
-            <label className="cstudy-control"><span>Bus-hour budget</span><select value={selectedBudget?.budget_bus_hours ?? ''} onChange={(event) => setBudgetChoice(event.target.value)} disabled={!budgets.length}>
-              {budgets.length ? budgets.map((item, index) => <option key={`${item?.budget_bus_hours ?? 'budget'}-${index}`} value={item?.budget_bus_hours ?? ''}>{formatBusHours(item?.budget_bus_hours)}</option>) : <option value="">No budget results</option>}
-            </select></label>
-            {selectedBudget?.run_id && <span className="cstudy-run-id">Run ID {selectedBudget.run_id}</span>}
-          </div>
           {selectedBudget ? <>
             <div className="cstudy-metrics cstudy-budget-metrics">
               <Metric label="Buses in plan" value={formatCount(selectedBudget.bus_count)} />
@@ -229,6 +230,7 @@ function CaseStudy({ study }) {
               <Metric label="Journeys restored" value={formatCount(selectedBudget.restored_count)} detail="Fixed test journeys" />
               <Metric label="Recovered within 60 minutes" value={formatCount(selectedBudget.recovered_within60_count)} detail={`Of ${formatCount(selectedDate.request_count)} fixed journeys`} />
               <Metric label="Saved capped journey time" value={formatDuration(selectedBudget.saved_capped_duration_s)} detail="90-minute cap across the fixed query set" />
+              {Number.isFinite(selectedBudget.impacted_saved_capped_duration_s) && <Metric label="Saved time among closure-delayed journeys" value={formatDuration(selectedBudget.impacted_saved_capped_duration_s)} detail="The fixed nominally delayed cohort; excludes gains for other journeys" />}
               <Metric label="Improved journeys" value={formatCount(selectedBudget.improved_count)} detail="Fixed test journeys" />
               <Metric label="Saved query-minutes per bus-hour" value={queryMinutesPerBusHourLabel(selectedBudget.saved_query_minutes_per_bus_hour, selectedBudget.used_bus_hours)} detail="Fixed test workload measure; not a financial return" />
             </div>
@@ -256,12 +258,12 @@ function CaseStudy({ study }) {
           <div className="cstudy-table-wrap">
             <table className="cstudy-table">
               <caption>Stress outcomes for {selectedBudget ? formatBusHours(selectedBudget.budget_bus_hours) : 'the selected budget'}.</caption>
-              <thead><tr><th scope="col">Additional bus seconds</th><th scope="col">Buses in plan</th><th scope="col">Journeys restored</th><th scope="col">Recovered within 60 minutes</th><th scope="col">Capped time saved</th><th scope="col">Improved journeys</th><th scope="col">Bus-hours used</th><th scope="col">Query-minutes per bus-hour</th><th scope="col">Run ID</th></tr></thead>
+              <thead><tr><th scope="col">Additional bus seconds</th><th scope="col">Buses in plan</th><th scope="col">Lost within 60 minutes</th><th scope="col">Journeys restored</th><th scope="col">Recovered within 60 minutes</th><th scope="col">Capped time saved</th><th scope="col">Improved journeys</th><th scope="col">Bus-hours used</th><th scope="col">Query-minutes per bus-hour</th><th scope="col">Run ID</th></tr></thead>
               <tbody>{selectedBudget?.budget_bus_hours === 2 && sensitivities.length ? sensitivities.map((item, index) => <tr key={`${item?.additional_bus_seconds ?? 'stress'}-${index}`}>
                 <th scope="row">{Number.isFinite(item?.additional_bus_seconds) ? item.additional_bus_seconds === 0 ? '0 · base running time' : `${formatCount(item.additional_bus_seconds)} · hypothetical` : 'Assumption not included'}</th>
-                <td>{formatCount(item?.bus_count)}</td><td>{formatCount(item?.restored_count)}</td><td>{formatCount(item?.recovered_within60_count)}</td><td>{formatDuration(item?.saved_capped_duration_s)}</td><td>{formatCount(item?.improved_count)}</td><td>{formatBusHours(item?.used_bus_hours)}</td>
+                <td>{formatCount(item?.bus_count)}</td><td>{formatCount(item?.lost_count)}<small>{formatCount(item?.baseline_within60_count)} → {formatCount(item?.disrupted_within60_count)} before recovery</small></td><td>{formatCount(item?.restored_count)}</td><td>{formatCount(item?.recovered_within60_count)}</td><td>{formatDuration(item?.saved_capped_duration_s)}</td><td>{formatCount(item?.improved_count)}</td><td>{formatBusHours(item?.used_bus_hours)}</td>
                 <td>{queryMinutesPerBusHourLabel(item?.saved_query_minutes_per_bus_hour, item?.used_bus_hours)}</td><td>{item?.run_id ?? 'Not included'}</td>
-              </tr>) : <tr><td colSpan="9" className="cstudy-table-empty">{selectedBudget?.budget_bus_hours === 2
+              </tr>) : <tr><td colSpan="10" className="cstudy-table-empty">{selectedBudget?.budget_bus_hours === 2
                 ? 'No sensitivity outcomes are included for this study date and two bus-hour budget.'
                 : 'This study tests stress at two bus-hours only. Select 2 bus-hours to inspect those outcomes.'}</td></tr>}</tbody>
             </table>
@@ -282,23 +284,27 @@ function CaseStudy({ study }) {
         </Section>
       </>}
 
-      <Section eyebrow="Method and evidence" title="Protocol, assumptions and sources" className="cstudy-method">
-        <div className="cstudy-method-grid">
-          <div><h3>Protocol</h3><dl className="cstudy-details">
-            <div><dt>Version</dt><dd>{fieldValue(protocol.version)}</dd></div>
-            <div><dt>Protocol hash</dt><dd className="cstudy-hash">{fieldValue(protocol.hash ?? protocol.protocol_hash ?? protocol.hash_sha256 ?? protocol.sha256)}</dd></div>
-            <div><dt>Selection rule</dt><dd>{fieldValue(protocol.selection_rule)}</dd></div>
-            <div><dt>Reachability threshold</dt><dd>60 minutes</dd></div>
-            <div><dt>Capped duration threshold</dt><dd>90 minutes</dd></div>
-          </dl></div>
-          <div><h3>Assumptions</h3>{Array.isArray(assumptions) ? assumptions.length
-            ? <ul className="cstudy-assumption-list">{assumptions.map((value, index) => <li key={index}>{fieldValue(value)}</li>)}</ul>
-            : <p className="cstudy-section-note">Assumptions not included in this record.</p>
-            : assumptionEntries.length ? <dl className="cstudy-details">{assumptionEntries.map(([key, value], index) => <div key={`${key}-${index}`}><dt>{formatLabel(key) || `Assumption ${index + 1}`}</dt><dd>{fieldValue(value)}</dd></div>)}</dl>
-              : <p className="cstudy-section-note">Assumptions not included in this record.</p>}</div>
+      <details className="cstudy-panel cstudy-method">
+        <summary><span className="cstudy-eyebrow">Method and evidence</span><strong>Protocol, assumptions and sources</strong></summary>
+        <div className="cstudy-method-content">
+          <div className="cstudy-method-grid">
+            <div><h3>Protocol</h3><dl className="cstudy-details">
+              <div><dt>Version</dt><dd>{fieldValue(protocol.version)}</dd></div>
+              <div><dt>Selected snapshot ID</dt><dd>{fieldValue(selectedDate?.snapshot_id)}</dd></div>
+              <div><dt>Protocol hash</dt><dd className="cstudy-hash">{fieldValue(protocol.hash ?? protocol.protocol_hash ?? protocol.hash_sha256 ?? protocol.sha256)}</dd></div>
+              <div><dt>Selection rule</dt><dd>{fieldValue(protocol.selection_rule)}</dd></div>
+              <div><dt>Reachability threshold</dt><dd>60 minutes</dd></div>
+              <div><dt>Capped duration threshold</dt><dd>90 minutes</dd></div>
+            </dl></div>
+            <div><h3>Assumptions</h3>{Array.isArray(assumptions) ? assumptions.length
+              ? <ul className="cstudy-assumption-list">{assumptions.map((value, index) => <li key={index}>{fieldValue(value)}</li>)}</ul>
+              : <p className="cstudy-section-note">Assumptions not included in this record.</p>
+              : assumptionEntries.length ? <dl className="cstudy-details">{assumptionEntries.map(([key, value], index) => <div key={`${key}-${index}`}><dt>{formatLabel(key) || `Assumption ${index + 1}`}</dt><dd>{fieldValue(value)}</dd></div>)}</dl>
+                : <p className="cstudy-section-note">Assumptions not included in this record.</p>}</div>
+          </div>
+          <div className="cstudy-evidence"><h3>Evidence links</h3>{evidence.length ? <ul>{evidence.map((item, index) => <li key={`${item.url}-${index}`}><a href={item.url} target="_blank" rel="noreferrer">{item.title || item.label || item.url}</a></li>)}</ul> : <p className="cstudy-section-note">No HTTPS evidence links are included.</p>}</div>
         </div>
-        <div className="cstudy-evidence"><h3>Evidence links</h3>{evidence.length ? <ul>{evidence.map((item, index) => <li key={`${item.url}-${index}`}><a href={item.url} target="_blank" rel="noreferrer">{item.title || item.label || item.url}</a></li>)}</ul> : <p className="cstudy-section-note">No HTTPS evidence links are included.</p>}</div>
-      </Section>
+      </details>
     </>}
   </div>;
 }

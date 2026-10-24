@@ -1,6 +1,7 @@
 """Add the reviewed case study without replacing the original demo comparisons."""
 import argparse
 import csv
+from datetime import datetime
 import hashlib
 import io
 import json
@@ -56,6 +57,34 @@ for rel, expected in base_manifest['files'].items():
 study = read(args.study / 'case-study.json')
 if study.get('protocol', {}).get('hash') != protocol_sha:
     raise SystemExit('Compact study protocol identity differs')
+protocol = read(args.study / 'protocol.json')
+if (study.get('study_id') != protocol['config']['study_id']
+        or study['protocol'].get('reachability_seconds') != 3600
+        or study['protocol'].get('duration_cap_seconds') != 5400):
+    raise SystemExit('Compact study or objective identity differs')
+if len(study['dates']) != 4 or {d['date'] for d in study['dates']} != expected_dates:
+    raise SystemExit('Study must retain all registered public dates exactly once')
+# The verifier checked these source bytes through the cell input chain. Bind the
+# current export inputs again before creating any public output directory.
+for date in study['dates']:
+    day = date['date']
+    input_path = args.study / 'inputs' / f'{day}.json'
+    selection_path = args.study / 'selections' / f'{day}.json'
+    manifest, selection = read(input_path), read(selection_path)
+    snapshot_path = args.study / 'snapshots' / f'{day}.json'
+    if (manifest['protocol_sha256'] != protocol_sha
+            or selection['manifest_sha256'] != sha(input_path)
+            or manifest['snapshot_sha256'] != sha(snapshot_path)):
+        raise SystemExit('Current export source chain differs: ' + day)
+    snapshot_metadata = read(snapshot_path)['metadata']
+    if (not date['snapshot_id'] == manifest['snapshot_id'] == snapshot_metadata['snapshot_id']
+            or datetime.fromisoformat(date['snapshot_at']) != datetime.fromisoformat(snapshot_metadata['snapshot_at'])):
+        raise SystemExit('Compact snapshot identity or cutoff differs: ' + day)
+    for budget, delta in [(b, 0) for b in (0, 2, 4, 8)] + [(2, 300), (2, 600)]:
+        result = read(args.study / 'cells' / f'{day}-b{budget}-d{delta}.json')['result']
+        if (result['manifest_sha256'] != sha(input_path)
+                or result['selection_sha256'] != sha(selection_path)):
+            raise SystemExit('Current export inputs differ from checked cell: ' + day)
 study.update(title='When the Fairfield–Central rail corridor closes',
     question='How much can extra buses help, and how many bus-hours do they use?',
     disruption='Hypothetically close the Fairfield–Central rail section from 07:30 to 09:30. Every train crossing the section during that interval is cancelled for its complete trip in this model.',
@@ -67,8 +96,16 @@ study['evidence'] = [
     {'label': 'Frozen protocol, source coverage and verification identities', 'url': base_url + 'case-study-evidence.json'},
     {'label': 'Study findings and interpretation', 'url': 'https://github.com/Suhail15/brisbane-transport-resilience-lab/blob/main/docs/CORRIDOR_CASE_STUDY.md'},
 ]
-if {d['date'] for d in study['dates']} != expected_dates:
-    raise SystemExit('Study must retain all registered public dates')
+study['assumptions'] = [
+    'Recorded provider predictions and scheduled fallback are inputs, not measured arrivals. The rail closure and extra buses are simulated.',
+    'The source-expanded network includes existing bus alternatives at the four stations. Mapped walking access remains incomplete: 600 m per link, 1.2 m/s walking, five-minute transfers and at most three vehicle changes.',
+    'Each extra bus is assumed available at its pattern terminal, 10, 25, 40 or 55 minutes after the decision. A complete two-hour duty, including five-minute terminal turns, costs two bus-hours.',
+    'Fleet availability, depot and driver positioning, passenger demand, crowding and vehicle capacity are not established. These results are not an operational dispatch recommendation.',
+    'All 240 equally weighted primary requests remain in the comparison; 100 original control requests are scored separately. Duration scores cap each query at 90 minutes, including unavailable queries.',
+    'Compare no extra service, a service-frequency policy and the best evaluated plan among at most twelve candidate duties. Bounded search does not prove a globally optimal plan.',
+    'Duties can end after the closure. Their full costs are counted; savings after the closure are identified separately. Query-minutes are workload measures, not passenger or financial savings.',
+    'October 22 is separate confirmation; October 19–21 reuse earlier recording dates for replication. Correlated recorded examples are not independent passenger samples.',
+]
 shutil.copytree(args.base, args.output)
 metrics, sources, rows = [], [], []
 policy_labels = {'no_action': 'No extra service', 'simple_frequency': 'Most frequent relevant bus pattern', 'best_evaluated': 'Best evaluated recovery'}
@@ -106,6 +143,8 @@ for date in study['dates']:
         for field in ('request_id', 'departure_s', 'baseline_duration_s', 'disrupted_duration_s', 'recovered_duration_s'):
             if item.get('example', {}).get(field) != example[field]:
                 raise SystemExit('Compact fixed example differs: ' + day + '/' + field)
+        item.update({field: best['full'][field] for field in
+                     ('baseline_within60_count', 'disrupted_within60_count', 'lost_count')})
         decomposition = result['policies']['best_evaluated']['full']['decomposition']
         item.update(impacted_saved_capped_duration_s=decomposition['nominal_impacted']['saved_capped_duration_s'],
                     other_saved_capped_duration_s=decomposition['not_nominal_impacted']['saved_capped_duration_s'],

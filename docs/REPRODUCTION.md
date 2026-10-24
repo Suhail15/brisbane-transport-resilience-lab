@@ -41,7 +41,7 @@ does not require the full raw archive, a database, a broker or upstream requests
 From the extracted pack directory, using its locked Python environment:
 
 ```text
-python code/scripts/run_case_study.py reproduce --destination . --expected-manifest-sha256 <externally-published-manifest-sha256>
+python -B code/scripts/run_case_study.py reproduce --destination . --expected-manifest-sha256 <externally-published-manifest-sha256>
 ```
 
 This recomputes every packed cell, including selected duties and all primary
@@ -49,6 +49,9 @@ and control route arrays. The comparison excludes elapsed time. A full run can
 take substantially longer than an individual journey query. Source topology,
 metric reconciliation and exact recomputation are different checks; none alone
 establishes observed passenger benefit or a globally optimal recovery plan.
+
+Use `-B` as shown so imports do not add bytecode caches inside the strictly
+manifested pack. Extract a fresh copy if another tool has already added files.
 
 With eligible local source archives, `scripts/run_case_study.py prepare` freezes
 isolated study inputs. `run --dates ...` defaults to development execution;
@@ -64,3 +67,12 @@ independent and reproduction evidence, verifies the checked cell bytes, retains
 the original result/replay files, and exports separate per-query CSV and ODbL
 walking databases. This command prepares an artifact; publication still requires
 the candidate-specific checks described in [RELEASE.md](RELEASE.md).
+
+For a distributable study pack, use `scripts/prepare_case_study_reproduction.py`
+with `--source`, `--destination`, `--dates` and an external `--report` path.
+It wraps the unchanged numerical producer and includes the two source package
+initializers before pinning the final manifest. Both files must contain only
+their original docstrings. This prevents an existing editable installation from
+silently supplying package code during reproduction. The projection report binds
+the original and final manifest hashes, exact initializer bytes and unchanged
+calculation-code identity.
