@@ -266,3 +266,51 @@ Owner: ARCH-001, GPT-6.1 Sol, reasoning max.
     gates. The fixed example is Fairfield p2→Central p1 at cutoff, regardless of
     its recovery result. Source-defined missing Park Road and Roma Street's lack
     of rail platforms 1/2 are respected; source IDs are never guessed by name.
+30. **Objective-preserving case-study scoring window, approved 2026-10-23.**
+    Development no-action cells took 120/232 seconds and the first twelve-option
+    recovery comparison remained CPU active for several minutes. No confirmation
+    policy outcome has been inspected. Keep the exact frozen workload, scenario,
+    candidates, objective, budgets and 128-swap bound; do not reduce the study.
+    ARCH-013 reviewed a scoring-only timetable derivation: retain complete source
+    trips if any movement departs at or before the latest primary departure plus
+    5,400 seconds, plus complete source trips witnessing each selected bus pattern
+    and every otherwise absent scenario segment. All original movements before
+    the cutoff remain, full source references remain valid and the unchanged pure
+    engine performs the search. Nonnegative movement/walk times imply every path
+    arriving within ninety minutes is retained, so the sixty-minute restoration
+    and ninety-minute capped-duration objective are identical for every subset.
+    All rail-cancellation crossings occur before the scoring cutoff. Source
+    feasibility, nominal relevance/frequency/cohort selection and published raw
+    journey arrays still use full effective snapshots. Record the scoring version,
+    cutoff, retained/witness trip IDs and derived snapshot hash. This is an exact
+    computational shortcut for the stated objective, not a new operating model.
+    Preserve the first complete full-timetable development two-hour result and
+    old code/workspace, then stop old workers before editing their frozen code.
+    Refreeze the unchanged analytical config with revised wrapper code, and prove
+    exact selected-ID/objective parity for real development zero/two-hour cells
+    and all subsets on a small boundary/witness fixture before confirmation.
+    Published outputs and independent checks must always reconcile full routes.
+31. **Station-access bus coverage correction, approved 2026-10-23.**
+    Development review found that all 120 lost queries involved Roma Street.
+    The original pilot retains buses serving the Fairfield/Annerley rectangle;
+    it omits working busway alternatives at other selected stations. ARCH-014
+    verified forty of those 120 queries have direct scheduled bus alternatives
+    within sixty minutes using existing real walking links on both development
+    dates. Do not report the incomplete-network losses as realistic outage harm.
+    Before any confirmation policy outcome, supersede this proposed study with
+    `configs/corridor-impact.v2.json`. Keep the same primary/control requests,
+    closure, candidates/phases, budgets, stress and objective. Expand only source
+    coverage: freeze 29 actual mapped-walk bus catchment stops at the eight fixed
+    platforms, and all 103 bus shortnames source-active at those stops on either
+    9/13 October, union the original pilot. This adds 84 names (156 total including
+    original rail names), without a time/frequency/outcome filter. Retain complete
+    active trips on later dates; missing/newly unsupported services remain visible.
+    Record raw development GTFS/OSM/input identities, exact source-selected stop/
+    route lists, full-trip counts and preserved walking witnesses. Optional pilot
+    selection in existing normalizers must bind actual pilot bytes and isolate
+    filtered caches so base-pilot data cannot masquerade as expanded coverage.
+    Preserve the full initial proposal, interrupted workers and exact scoring-
+    parity evidence. Freeze/review the corrected inputs and development outcomes
+    before opening confirmation. Accept realistic small/null recovery benefits
+    if the existing bus network already provides alternatives; never omit those
+    alternatives, alter the incident, or tune thresholds to manufacture savings.

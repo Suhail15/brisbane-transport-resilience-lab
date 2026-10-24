@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "study_id": "corridor-impact-v2",
+  "timezone": "Australia/Brisbane",
+  "development_dates": [
+    "2026-10-09",
+    "2026-10-13"
+  ],
+  "replication_dates": [
+    "2026-10-19",
+    "2026-10-20",
+    "2026-10-21"
+  ],
+  "confirmation_dates": [
+    "2026-10-22"
+  ],
+  "decision_local_time": "07:30:05",
+  "closure_duration_seconds": 7200,
+  "section_station_names": [
+    "Fairfield",
+    "Dutton Park",
+    "South Bank",
+    "South Brisbane",
+    "Roma Street",
+    "Central"
+  ],
+  "primary_station_platforms": [
+    {
+      "station": "Fairfield",
+      "stop_ids": [
+        "600052",
+        "600194"
+      ]
+    },
+    {
+      "station": "South Bank",
+      "stop_ids": [
+        "600006",
+        "600188"
+      ]
+    },
+    {
+      "station": "Roma Street",
+      "stop_ids": [
+        "600033",
+        "600036"
+      ]
+    },
+    {
+      "station": "Central",
+      "stop_ids": [
+        "600018",
+        "600017"
+      ]
+    }
+  ],
+  "platform_selection_rule": "The two numerically lowest rail-platform numbers at each of four fixed stations in the development GTFS. Exact IDs remain fixed; no date-specific substitution. Roma Street starts at platforms 3 and 4, not the similarly named busway platforms.",
+  "offset_seconds": [
+    0,
+    900,
+    1800,
+    2700,
+    3600
+  ],
+  "primary_request_count": 240,
+  "primary_selection_rule": "All ordered interstation combinations of the eight fixed platform IDs, expanded at five fixed departure offsets. Equal query weights, including unavailable source stops or paths; no filtering by disruption or recovery outcome.",
+  "control_journey_set": "configs/journey-set.v1.json",
+  "control_request_count": 100,
+  "control_rule": "Score the original OD20 requests separately under the plans optimized for the primary census. Never pool denominators or double-weight duplicate queries across cohorts.",
+  "scenario_selection_rule": "All actual adjacent rail movements whose endpoint station names are different members of the fixed Fairfield-Central section, including express movements. Close both directions for two hours. Existing engine semantics cancel every complete source trip crossing a selected segment during the interval. No source bus movement may be selected.",
+  "candidate_pair_limit": 3,
+  "activation_offsets_seconds": [
+    600,
+    1500,
+    2400,
+    3300
+  ],
+  "candidate_rule": "Use the existing affected-corridor candidate selector on nominal primary inputs, at most three source-supported paired bus patterns. Expand each at the four fixed activation offsets, at most twelve candidates. One hypothetical bus and a full two-hour duty per candidate, unchanged source running times and five-minute terminal turns. Freeze nominal identities across sensitivity levels.",
+  "duty_horizon_limit": "Duties end 09:40-10:25, after the hypothetical closure ends09:30:05. Count their full two-hour cost. Decompose improvements by whether the recovered query arrives after the closure ends; neither timetable running times nor initial vehicle positioning establish actual dispatch feasibility.",
+  "budgets_bus_hours": [
+    0,
+    2,
+    4,
+    8
+  ],
+  "sensitivity_budget_bus_hours": 2,
+  "sensitivity_seconds": [
+    0,
+    300,
+    600
+  ],
+  "max_swap_evaluations": 128,
+  "simple_policy_rule": "Among nominal relevant paired patterns, rank by unique source bus trips departing within the two-hour closure interval, descending, then pair ID. Dispatch the most frequent feasible pair at the fixed activation offsets up to the budget, retaining infeasibility reasons. This is service frequency, not passenger demand; do not claim the legacy affected-bus heuristic applies to rail-only cancellation.",
+  "reachability_seconds": 3600,
+  "duration_cap_seconds": 5400,
+  "walking_speed_mps": 1.2,
+  "maximum_walking_link_metres": 600,
+  "transfer_slack_seconds": 300,
+  "maximum_transfers": 3,
+  "primary_outcomes": [
+    "lost_count",
+    "restored_count",
+    "signed_capped_duration_change",
+    "improved_query_count",
+    "used_bus_hours"
+  ],
+  "secondary_outcomes": [
+    "baseline_impacted_cohort_duration",
+    "query_minutes_per_bus_hour",
+    "separate_control_metrics"
+  ],
+  "impacted_cohort_rule": "A nominal baseline-reachable primary query whose disrupted capped duration exceeds its baseline capped duration. Determine once before recovery; retain this same cohort for every budget and stress. Always display full primary and separate control denominators too.",
+  "example_rule": "Show the fixed Fairfield platform 2 to Central platform 1 query departing at the decision cutoff, including null outcomes; never choose the example by recovery benefit.",
+  "interpretation": "Exploratory development and separately frozen confirmation of a hypothetical broad rail outage. Recorded provider predictions and schedule fallback are not measured arrivals. No calibrated passenger demand, vehicle capacity, fleet positioning, financial return or real-world savings are inferred. Missing walking access is retained as a limitation. More severe disruption and a new primary workload do not replace or retroactively improve v1.0.0 findings. The expanded station-access network includes development-source connecting bus lines; results remain conditional on this frozen route selection, mapped walking access and a travel-time model without passenger capacity or fleet positioning.",
+  "network_config": "configs/station-access-network.v1.json",
+  "network_selection_rule": "Union the original pilot with every source-active bus route shortname on either development date serving the fixed bus stops reached by actual mapped walking links to/from the eight census platforms. Freeze the exact catchment stop IDs and shortnames before confirmation. Preserve complete source trips, calendars and predicted/scheduled provenance. No frequency or outcome threshold.",
+  "supersedes": {
+    "study_id": "corridor-impact-v1",
+    "reason": "Development source audit found material busway alternatives omitted by the original Fairfield-serving bus-route pilot. All initial development outputs, exact scoring-parity results and original release results remain preserved. No confirmation or replication recovery outcomes were inspected before this source-coverage correction."
+  }
+}
